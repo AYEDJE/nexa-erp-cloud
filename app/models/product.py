@@ -1,33 +1,35 @@
+from sqlalchemy import Column, String, Float, Integer
 from pydantic import BaseModel
-from sqlalchemy import Column, Integer, String, Float
-
 from app.core.database import Base
 
 
-# Table réelle en base de données 
+# --- Modèle SQLAlchemy (Base de données) ---
 class ProductORM(Base):
     __tablename__ = "products"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(String, index=True, nullable=False)  # isolation multi-tenant
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    tenant_id = Column(String, index=True, nullable=False)
     name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
     price = Column(Float, nullable=False)
-    quantity = Column(Integer, nullable=False)
+    stock = Column(Integer, default=0)
 
 
-# ---------- Schéma utilisé pour CRÉER un produit (données reçues) ----------
-class ProductCreate(BaseModel):
+# --- Schémas Pydantic ---
+class ProductBase(BaseModel):
     name: str
+    description: str | None = None
     price: float
-    quantity: int
+    stock: int = 0
 
 
-# ---------- Schéma utilisé pour RENVOYER un produit (données envoyées) ----------
-class Product(BaseModel):
+class ProductCreate(ProductBase):
+    pass
+
+
+class ProductResponse(ProductBase):
     id: int
-    name: str
-    price: float
-    quantity: int
+    tenant_id: str
 
     class Config:
-        from_attributes = True  # permet de construire ce schéma depuis ProductORM
+        from_attributes = True
