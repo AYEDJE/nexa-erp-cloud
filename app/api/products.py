@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.tenant import get_current_tenant
+from app.core.tenant import get_current_tenant_id
 from app.core.rbac import RoleChecker
 from app.models.product import ProductORM, ProductCreate, ProductResponse
 
@@ -17,7 +17,7 @@ allow_admin_only = RoleChecker(["admin", "super_admin"])
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(allow_staff_or_admin)])
 def create_product(
     product_in: ProductCreate,
-    tenant_id: str = Depends(get_current_tenant),
+    tenant_id: str = Depends(get_current_tenant_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -38,7 +38,7 @@ def create_product(
 
 @router.get("/", response_model=List[ProductResponse], dependencies=[Depends(allow_staff_or_admin)])
 def list_products(
-    tenant_id: str = Depends(get_current_tenant),
+    tenant_id: str = Depends(get_current_tenant_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -51,7 +51,7 @@ def list_products(
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(allow_admin_only)])
 def delete_product(
     product_id: int,
-    tenant_id: str = Depends(get_current_tenant),
+    tenant_id: str = Depends(get_current_tenant_id),
     db: Session = Depends(get_db)
 ):
     """
