@@ -12,21 +12,22 @@ from app.models.invoice import InvoiceORM, InvoiceItemORM  # <-- Inclus les fact
 # 2. Création automatique des tables
 Base.metadata.create_all(bind=engine)
 
-# 3. Instanciation de l'application FastAPI (OBLIGATOIREMENT AVANT d'inclure les routeurs)
+# 3. Instanciation de l'application FastAPI
 app = FastAPI(
     title="NexaERP Cloud API",
-    description="Backend SaaS Multi-Tenant sécurisé avec RBAC et Facturation",
-    version="1.0.0"
+    description="Backend SaaS Multi-Tenant sécurisé avec RBAC, Facturation et Assistant IA",
+    version="2.0.0"
 )
 
-# 4. Importation et inclusion de TOUS les routeurs API
-from app.api import invoices, products, users
+# 4. Importation et inclusion de TOUS les routeurs API (Inclusion de `ai`)
+from app.api import invoices, products, users, ai  # <-- Ajout du module ai ici
 from app.routers import auth
 
 app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(users.router)
-app.include_router(invoices.router) # <-- Placé AU BON ENDROIT ici !
+app.include_router(invoices.router)
+app.include_router(ai.router)  # <-- Routeur de l'Assistant IA inclus ici !
 
 # 5. Contrôle d'accès RBAC
 allow_admin_only = RoleChecker(["admin", "super_admin"])
