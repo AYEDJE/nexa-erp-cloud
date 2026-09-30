@@ -8,7 +8,6 @@ from app.services.ai_service import process_ai_query
 
 router = APIRouter(prefix="/ai", tags=["Assistant IA & Analytics"])
 
-
 @router.post("/query", response_model=AIQueryResponse, status_code=status.HTTP_200_OK)
 def query_ai_assistant(
     request: AIQueryRequest,
