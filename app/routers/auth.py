@@ -6,9 +6,7 @@ from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.models.user import UserORM, UserCreate, UserResponse, Token, UserType
 
-SECRET_KEY = "votre_cle_secrete_ultra_securisee_nexa_erp"  # À modifier plus tard en var d'environnement
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(
     prefix="/auth",
@@ -83,6 +81,6 @@ def login_for_access_token(
     }
 
     # Génération du jeton signé
-    access_token = create_access_token(data=jwt_payload)
+    access_token = create_access_token(data={"sub": user.email})
 
     return {"access_token": access_token, "token_type": "bearer"}

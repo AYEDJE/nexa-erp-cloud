@@ -8,7 +8,8 @@ from app.models.user import UserORM
 from app.models.product import ProductORM
 from app.models.rbac import RoleORM, PermissionORM
 from app.models.invoice import InvoiceORM, InvoiceItemORM  # <-- Inclus les factures
-
+import app.models.audit
+from app.api.audit import router as audit_router
 # 2. Création automatique des tables
 Base.metadata.create_all(bind=engine)
 
@@ -27,8 +28,8 @@ app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(users.router)
 app.include_router(invoices.router)
-app.include_router(ai.router)  # <-- Routeur de l'Assistant IA inclus ici !
-
+app.include_router(ai.router)  # <-- Routeur de l'Assistant IA 
+app.include_router(audit_router) # <-- Routeur d'audit
 # 5. Contrôle d'accès RBAC
 allow_admin_only = RoleChecker(["admin", "super_admin"])
 

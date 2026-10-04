@@ -1,7 +1,10 @@
 from typing import List
 from fastapi import Depends, HTTPException, status
 from jose import JWTError, jwt
-from app.core.tenant import oauth2_scheme, SECRET_KEY, ALGORITHM
+from fastapi.security import OAuth2PasswordBearer
+from app.core.config import SECRET_KEY, ALGORITHM
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
 class RoleChecker:
