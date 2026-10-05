@@ -39,6 +39,8 @@ class InvoiceORM(Base):
 
     date = Column(DateTime, default=datetime.utcnow)
     due_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     status = Column(Enum(InvoiceStatus), default=InvoiceStatus.DRAFT)
 
@@ -63,7 +65,7 @@ class InvoiceItemORM(Base):
     image_url = Column(String, nullable=True)
     unit = Column(String, nullable=True)
     quantity = Column(Integer, default=1)
-    unit_price = Column(Float, default=0.0)
+    unit_price_ht = Column(Float, default=0.0)
     tva_rate = Column(Float, default=19.0)
     discount = Column(Float, default=0.0)
 
