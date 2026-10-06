@@ -81,6 +81,6 @@ def login_for_access_token(
     }
 
     # Génération du jeton signé
-    access_token = create_access_token(data={"sub": user.email})
+    access_token = create_access_token(data=jwt_payload)
 
     return {"access_token": access_token, "token_type": "bearer"}

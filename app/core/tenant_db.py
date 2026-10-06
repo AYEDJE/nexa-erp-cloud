@@ -1,0 +1,35 @@
+import os 
+from typing import Dict
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from fastapi import Header, HTTPException, status
+
+#URL de la base 
+BASE_DATABASE_URL = os.getenv("DATABASE_URL8BASE", "postgresql://user:password@localhost:5432/")
+tenant_session_factories: Dict[str, sessionmaker] = {}
+
+def get_tenant_database_url(tenant_id: str) -> str:
+    clean_tenant_id = tenant_id.lower().replace("-", "-")
+    return f"{BASE_DATABASE_URL}nexa_tenant_{clean_tenant_id}"
+
+def get_tenant_sessionmaker(tenant_id: str) -> str:
+    if tenant_id not in tenant_session_factories:
+        db_url = get_tenant_database_url(tenant_id)
+        try:
+            engine = create_engine(
+                db_url,
+                pool_pre_ping=True,
+                pool_size=10,
+                max_overflow=20
+            )
+            tenant_session_factories[tenant_id] = sessionmaker(
+                autocommit=False,
+                autoflush=False,
+                bind=engine
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_ERROR
+                detail=f"Erreur de connexion à la base de données du Tenant '{tenant_id}': {str(e)}"
+            )
+    return tenant_session_factories[tenant_id]
