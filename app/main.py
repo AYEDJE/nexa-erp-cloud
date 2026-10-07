@@ -1,36 +1,34 @@
-from fastapi import FastAPI, Depends
+from app.api import warehouse
+from app.api import invoices, products, users, ai
 from app.core.database import Base, engine
 from app.core.tenant import get_current_tenant_id
 from app.core.rbac import RoleChecker
-
-# 1. Modèles BDD (Pour s'assurer que SQLAlchemy crée toutes les tables)
 from app.models.user import UserORM
 from app.models.product import ProductORM
-from app.models.rbac import RoleORM, PermissionORM
-from app.models.invoice import InvoiceORM, InvoiceItemORM  # <-- Inclus les factures
+from app.models.rbac import PermissionORM, RoleORM
+from app.models.invoice import InvoiceItemORM, InvoiceORM
+from app.models.warehouse import StockMovementORM, WarehouseORM
 import app.models.audit
 from app.api.audit import router as audit_router
-# 2. Création automatique des tables
+
 Base.metadata.create_all(bind=engine)
 
-# 3. Instanciation de l'application FastAPI
 app = FastAPI(
     title="NexaERP Cloud API",
     description="Backend SaaS Multi-Tenant sécurisé avec RBAC, Facturation et Assistant IA",
-    version="2.0.0"
+    version="2.0.0",
 )
 
-# 4. Importation et inclusion de TOUS les routeurs API (Inclusion de `ai`)
-from app.api import invoices, products, users, ai  # <-- Ajout du module ai ici
-from app.routers import auth
+from fastapi import FastAPI
 
 app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(users.router)
 app.include_router(invoices.router)
-app.include_router(ai.router)  # <-- Routeur de l'Assistant IA 
-app.include_router(audit_router) # <-- Routeur d'audit
-# 5. Contrôle d'accès RBAC
+app.include_router(ai.router)
+app.include_router(audit_router)
+app.include_router(warehouse.router)
+
 allow_admin_only = RoleChecker(["admin", "super_admin"])
 
 
