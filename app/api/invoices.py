@@ -67,6 +67,7 @@ def create_invoice(
 
     # 5. Création de l'enregistrement ORM
     new_invoice = InvoiceORM(
+<<<<<<< HEAD
     tenant_id=tenant_id,
     doc_type=invoice_in.doc_type,
     number=generated_number,
@@ -87,6 +88,28 @@ def create_invoice(
     total_in_words=words,
     items=db_items
 )
+=======
+        tenant_id=tenant_id,
+        doc_type=invoice_in.doc_type,
+        number=generated_number,
+        customer_name=invoice_in.customer.name,
+        customer_email=invoice_in.customer.email,
+        issuer=issuer_dict,
+        customer=customer_dict,
+        bank_details=bank_dict,
+        bc_number=invoice_in.bc_number,
+        bc_date=invoice_in.bc_date,
+        bl_number=invoice_in.bl_number,
+        payment_terms=invoice_in.payment_terms,
+        language=invoice_in.language,
+        status=InvoiceStatus.DRAFT,
+        total_ht=total_ht,
+        tax_amount=tax_amount,
+        total_ttc=total_ttc,
+        total_in_words=words,
+        items=db_items
+    )
+>>>>>>> 9e604c86e9c8a2eb5bc6435f0c3b62ac6fefb519
 
     db.add(new_invoice)
     db.commit()

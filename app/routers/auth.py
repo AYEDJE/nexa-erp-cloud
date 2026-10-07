@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token
-from app.models.user import UserORM, UserCreate, UserResponse, Token, UserType
+from app.models.user import UserORM, UserCreate, UserResponse, Token
 
 from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -54,7 +54,7 @@ def login_for_access_token(
     db: Session = Depends(get_db)
 ):
     """
-    Vérifie les identifiants et délivre un jeton JWT contenant 
+    Vérifie les identifiants et délivre un jeton JWT contenant
     l'email, le tenant_id et le user_type de l'utilisateur.
     """
     # Recherche de l'utilisateur par e-mail
@@ -80,7 +80,11 @@ def login_for_access_token(
         "user_id": user.id
     }
 
+<<<<<<< HEAD
     # Génération du jeton signé
+=======
+    # Génération du jeton signé avec les claims nécessaires
+>>>>>>> 9e604c86e9c8a2eb5bc6435f0c3b62ac6fefb519
     access_token = create_access_token(data=jwt_payload)
 
     return {"access_token": access_token, "token_type": "bearer"}
