@@ -8,10 +8,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
 class RoleChecker:
-    """
-    Dépendance FastAPI pour restreindre l'accès à une route
-    selon les types d'utilisateurs autorisés.
-    """
     def __init__(self, allowed_roles: List[str]):
         self.allowed_roles = allowed_roles
 
@@ -22,6 +18,9 @@ class RoleChecker:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+        if not token:
+            raise credentials_exception
+
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             user_type: str = payload.get("user_type")
@@ -29,7 +28,6 @@ class RoleChecker:
             if user_type is None:
                 raise credentials_exception
 
-            # Vérification du rôle contenu dans le token
             if user_type not in self.allowed_roles:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -38,5 +36,5 @@ class RoleChecker:
 
             return payload
 
-        except JWTError:
+        except (JWTError, Exception):
             raise credentials_exception

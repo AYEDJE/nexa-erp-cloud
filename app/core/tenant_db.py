@@ -1,6 +1,5 @@
 import os
 from typing import Dict
-
 from fastapi import HTTPException, status
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -20,7 +19,15 @@ def get_tenant_sessionmaker(tenant_id: str):
     if tenant_id not in tenant_session_factories:
         db_url = get_tenant_database_url(tenant_id)
         try:
-            engine = create_engine(db_url, pool_pre_ping=True)
+            if db_url.startswith("sqlite"):
+                engine = create_engine(db_url, connect_args={"check_same_thread": False})
+            else:
+                engine = create_engine(db_url, pool_pre_ping=True)
+
+            # Création automatique du schéma pour chaque tenant
+            from app.core.database import Base
+            Base.metadata.create_all(bind=engine)
+
             tenant_session_factories[tenant_id] = sessionmaker(
                 autocommit=False,
                 autoflush=False,

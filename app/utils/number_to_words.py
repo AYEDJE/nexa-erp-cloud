@@ -1,23 +1,19 @@
-from num2words import num2words
+try:
+    from num2words import num2words
+except ImportError:
+    num2words = None
 
 
 def amount_to_words(amount: float, lang: str = "fr", currency: str = "FCFA") -> str:
-    """
-    Convertit un montant numérique en lettres selon la langue spécifiée.
-    Langues supportées : 'fr' (Français), 'en' (Anglais), 'ar' (Arabe).
-    """
+    if num2words is None:
+        return f"{amount} {currency}"
+
     try:
-        # Séparation de la partie entière et des centimes
         units = int(amount)
         decimals = int(round((amount - units) * 100))
-
-        # Support de la langue
         lang_code = lang.lower() if lang in ["fr", "en", "ar"] else "fr"
-
-        # Conversion de la partie entière
         words = num2words(units, lang=lang_code)
 
-        # Construction de la phrase avec la devise
         if decimals > 0:
             decimals_words = num2words(decimals, lang=lang_code)
             if lang_code == "fr":
@@ -29,5 +25,5 @@ def amount_to_words(amount: float, lang: str = "fr", currency: str = "FCFA") -> 
         else:
             return f"{words} {currency}"
 
-    except Exception as e:
+    except Exception:
         return f"{amount} {currency}"

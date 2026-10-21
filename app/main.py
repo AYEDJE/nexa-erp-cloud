@@ -1,5 +1,7 @@
-from app.api import warehouse
-from app.api import invoices, products, users, ai
+from fastapi import FastAPI, Depends
+from app.api import warehouse, invoices, products, users, ai
+from app.api.audit import router as audit_router
+from app.routers import auth
 from app.core.database import Base, engine
 from app.core.tenant import get_current_tenant_id
 from app.core.rbac import RoleChecker
@@ -9,7 +11,6 @@ from app.models.rbac import PermissionORM, RoleORM
 from app.models.invoice import InvoiceItemORM, InvoiceORM
 from app.models.warehouse import StockMovementORM, WarehouseORM
 import app.models.audit
-from app.api.audit import router as audit_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,8 +19,6 @@ app = FastAPI(
     description="Backend SaaS Multi-Tenant sécurisé avec RBAC, Facturation et Assistant IA",
     version="2.0.0",
 )
-
-from fastapi import FastAPI
 
 app.include_router(auth.router)
 app.include_router(products.router)
