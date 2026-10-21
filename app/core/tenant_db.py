@@ -24,9 +24,9 @@ def get_tenant_sessionmaker(tenant_id: str):
             else:
                 engine = create_engine(db_url, pool_pre_ping=True)
 
-            # Création automatique du schéma pour chaque tenant
-            from app.core.database import Base
-            Base.metadata.create_all(bind=engine)
+            # Création automatique et mise à jour du schéma pour chaque tenant
+            from app.core.database import ensure_schema_up_to_date
+            ensure_schema_up_to_date(engine)
 
             tenant_session_factories[tenant_id] = sessionmaker(
                 autocommit=False,

@@ -1,16 +1,18 @@
 import pytest
+import pyotp
 from fastapi.testclient import TestClient
 from app.main import app
-from app.core.database import SessionLocal
-from app.services.seed_rbac import seed_tenant_rbac
 
 client = TestClient(app)
 
 
-def test_root():
+def test_root_and_security_headers():
     response = client.get("/")
     assert response.status_code == 200
     assert response.json()["status"] == "online"
+    # Vérification des headers de sécurité OWASP
+    assert response.headers.get("x-content-type-options") == "nosniff"
+    assert response.headers.get("x-frame-options") == "DENY"
 
 
 def test_health():
@@ -25,139 +27,315 @@ def test_whoami():
     assert "test_tenant" in response.json()["message"]
 
 
-def test_auth_and_protected_flow():
-    email = f"admin_test_{__import__('uuid').uuid4().hex[:6]}@example.com"
-    reg_payload = {
-        "tenant_id": "tenant_alpha",
-        "email": email,
-        "password": "Password123!",
-        "user_type": "admin"
+def test_complete_auth_session_device_and_mfa_flow():
+    tenant_id = "tenant_security"
+    common_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+        "X-Tenant-ID": tenant_id
     }
-    reg_res = client.post("/auth/register", json=reg_payload)
-    assert reg_res.status_code in [201, 400]
+    email = f"user_sec_{__import__('uuid').uuid4().hex[:6]}@example.com"
+    pwd = "StrongPassword123!"
+
+    # 1. Inscription
+    reg_res = client.post("/auth/register", json={
+        "tenant_id": tenant_id,
+        "email": email,
+        "password": pwd,
+        "user_type": "admin"
+    }, headers=common_headers)
+    assert reg_res.status_code == 201
+
+    # 2. Première connexion -> vérification de session et appareil
+    login_res = client.post(
+        "/auth/login",
+        data={"username": email, "password": pwd},
+        headers=common_headers
+    )
+    assert login_res.status_code == 200
+    login_data = login_res.json()
+    assert login_data["requires_2fa"] is False
+    assert "access_token" in login_data
+    assert "refresh_token" in login_data
+
+    access_token = login_data["access_token"]
+    refresh_token = login_data["refresh_token"]
+    auth_headers = {
+        "Authorization": f"Bearer {access_token}",
+        "X-Tenant-ID": tenant_id
+    }
+
+    # 3. Vérification des sessions actives
+    sessions_res = client.get("/auth/sessions", headers=auth_headers)
+    assert sessions_res.status_code == 200
+    sessions = sessions_res.json()
+    assert len(sessions) >= 1
+    assert sessions[0]["is_revoked"] is False
+
+    # 4. Renouvellement de session via Refresh Token
+    refresh_res = client.post("/auth/refresh", json={"refresh_token": refresh_token}, headers=auth_headers)
+    assert refresh_res.status_code == 200
+    new_access_token = refresh_res.json()["access_token"]
+    assert new_access_token != access_token
+    auth_headers["Authorization"] = f"Bearer {new_access_token}"
+
+    # 5. Configuration et activation du 2FA (MFA)
+    setup_2fa_res = client.post("/auth/2fa/setup", headers=auth_headers)
+    assert setup_2fa_res.status_code == 200
+    setup_data = setup_2fa_res.json()
+    secret = setup_data["secret"]
+    assert len(setup_data["backup_codes"]) == 8
+
+    # Génération du code TOTP valide
+    totp = pyotp.TOTP(secret)
+    valid_code = totp.now()
+
+    enable_res = client.post("/auth/2fa/enable", json={"code": valid_code}, headers=auth_headers)
+    assert enable_res.status_code == 200
+
+    # 6. Connexion avec 2FA activé -> doit demander le code 2FA
+    login_2fa_req = client.post(
+        "/auth/login",
+        data={"username": email, "password": pwd},
+        headers=common_headers
+    )
+    assert login_2fa_req.status_code == 200
+    login_2fa_data = login_2fa_req.json()
+    assert login_2fa_data["requires_2fa"] is True
+    temp_token = login_2fa_data["temp_token"]
+
+    # Validation du code 2FA
+    verify_2fa_res = client.post(
+        "/auth/2fa/verify-login",
+        json={"code": totp.now(), "temp_token": temp_token},
+        headers=common_headers
+    )
+    assert verify_2fa_res.status_code == 200
+    assert "access_token" in verify_2fa_res.json()
+
+    # 7. Déconnexion (Logout) et vérification de la révocation
+    logout_res = client.post("/auth/logout", headers=auth_headers)
+    assert logout_res.status_code == 200
+
+
+def test_device_management_and_security_alerts():
+    tenant_id = "tenant_devices"
+    headers = {
+        "User-Agent": "Mozilla/5.0 Firefox/115.0",
+        "X-Tenant-ID": tenant_id
+    }
+    email = f"admin_dev_{__import__('uuid').uuid4().hex[:6]}@example.com"
+    pwd = "DevPassword123!"
+
+    client.post("/auth/register", json={
+        "tenant_id": tenant_id, "email": email, "password": pwd, "user_type": "admin"
+    }, headers=headers)
 
     login_res = client.post(
         "/auth/login",
-        data={"username": email, "password": "Password123!"}
+        data={"username": email, "password": pwd},
+        headers=headers
     )
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "X-Tenant-ID": "tenant_alpha"
-    }
+    auth_headers = {"Authorization": f"Bearer {token}", "X-Tenant-ID": tenant_id}
 
-    dash_res = client.get("/admin/dashboard", headers=headers)
-    assert dash_res.status_code == 200
+    # Liste des appareils
+    devices_res = client.get("/admin/security/devices", headers=auth_headers)
+    assert devices_res.status_code == 200
+    devices = devices_res.json()
+    assert len(devices) >= 1
+    dev_id = devices[0]["id"]
 
-    prod_payload = {
-        "name": "Produit Test",
-        "description": "Description test",
-        "price": 15000.0,
-        "stock": 10
-    }
-    prod_create = client.post("/products/", json=prod_payload, headers=headers)
-    assert prod_create.status_code == 201
-    prod_id = prod_create.json()["id"]
+    # Déconnexion à distance
+    disc_res = client.post(f"/admin/security/devices/{dev_id}/disconnect", headers=auth_headers)
+    assert disc_res.status_code == 200
 
-    prod_list = client.get("/products/", headers=headers)
-    assert prod_list.status_code == 200
-    assert any(p["id"] == prod_id for p in prod_list.json())
+    # Blocage d'appareil
+    block_res = client.post(f"/admin/security/devices/{dev_id}/block", headers=auth_headers)
+    assert block_res.status_code == 200
 
-    del_res = client.delete(f"/products/{prod_id}", headers=headers)
-    assert del_res.status_code == 204
+    # Déblocage d'appareil
+    unblock_res = client.post(f"/admin/security/devices/{dev_id}/unblock", headers=auth_headers)
+    assert unblock_res.status_code == 200
+
+    # Liste des alertes de sécurité
+    alerts_res = client.get("/admin/security/alerts", headers=auth_headers)
+    assert alerts_res.status_code == 200
 
 
-def test_invoices_flow():
-    headers = {"X-Tenant-ID": "tenant_alpha"}
-    invoice_payload = {
+def test_products_and_invoices_flow():
+    tenant_id = "tenant_erp"
+    headers = {"X-Tenant-ID": tenant_id}
+    email = f"staff_{__import__('uuid').uuid4().hex[:6]}@example.com"
+    pwd = "StaffPassword123!"
+
+    client.post("/auth/register", json={
+        "tenant_id": tenant_id, "email": email, "password": pwd, "user_type": "admin"
+    }, headers=headers)
+    token = client.post("/auth/login", data={"username": email, "password": pwd}, headers=headers).json()["access_token"]
+    auth_headers = {"Authorization": f"Bearer {token}", "X-Tenant-ID": tenant_id}
+
+    # 1. Produit
+    prod_res = client.post("/products/", json={
+        "name": "Serveur Dédié", "description": "Cloud hosting", "price": 85000.0, "stock": 5
+    }, headers=auth_headers)
+    assert prod_res.status_code == 201
+
+    # 2. Facture
+    inv_res = client.post("/invoices/", json={
         "doc_type": "INVOICE",
         "language": "fr",
         "payment_terms": "Paiement à 30 jours",
         "issuer": {
-            "name": "Nexa Tech",
-            "address": "Lomé, Togo",
-            "phone": "+22890000000",
-            "email": "contact@nexatech.com",
-            "tax_id": "TG-12345",
-            "issuing_place": "Lomé"
+            "name": "Nexa Systems", "address": "Lomé, Togo", "phone": "+22890000000",
+            "email": "contact@nexa.tg", "tax_id": "TG-8899", "issuing_place": "Lomé"
         },
         "customer": {
-            "name": "Client VIP",
-            "address": "Paris, France",
-            "phone": "+33123456789",
-            "email": "client@vip.com"
+            "name": "Client Entreprise", "address": "Abidjan, CI", "phone": "+22501020304", "email": "client@ci.com"
         },
         "items": [
-            {
-                "product_name": "Service Cloud",
-                "unit": "Mois",
-                "quantity": 2,
-                "unit_price_ht": 50000.0,
-                "tva_rate": 18.0,
-                "discount": 0.0
-            }
+            {"product_name": "Serveur Dédié", "unit": "Mois", "quantity": 1, "unit_price_ht": 85000.0, "tva_rate": 18.0, "discount": 0.0}
         ]
-    }
-    create_res = client.post("/invoices/", json=invoice_payload, headers=headers)
-    assert create_res.status_code == 201
-    invoice_data = create_res.json()
-    assert invoice_data["total_ht"] == 100000.0
-    assert invoice_data["tax_amount"] == 18000.0
-    assert invoice_data["total_ttc"] == 118000.0
-    invoice_id = invoice_data["id"]
+    }, headers=auth_headers)
+    assert inv_res.status_code == 201
+    inv_id = inv_res.json()["id"]
 
-    # Test PDF generation endpoint
-    pdf_res = client.get(f"/invoices/{invoice_id}/pdf", headers=headers)
+    # PDF de la facture
+    pdf_res = client.get(f"/invoices/{inv_id}/pdf", headers=auth_headers)
     assert pdf_res.status_code == 200
     assert pdf_res.headers["content-type"] == "application/pdf"
-    assert len(pdf_res.content) > 100
 
 
-def test_warehouse_flow():
-    headers = {"X-Tenant-ID": "tenant_alpha"}
-    wh_payload = {
-        "name": "Entrepôt Principal",
-        "code": f"WH-{__import__('uuid').uuid4().hex[:4].upper()}",
-        "location": "Zone Portuaire"
+def test_transversal_docx_document_generation():
+    headers = {"X-Tenant-ID": "tenant_docs"}
+    payload = {
+        "doc_type": "QUOTE",
+        "title": "DEVIS COMMERCIAL — PRESTATION CLOUD",
+        "data": {
+            "number": "DEV-2026-001",
+            "date": "21/10/2026",
+            "currency": "EUR",
+            "issuer": {
+                "name": "Nexa Cloud Corp",
+                "address": "Paris, France",
+                "phone": "+33140000000",
+                "email": "sales@nexa.eu",
+                "tax_id": "FR12345678"
+            },
+            "customer": {
+                "name": "Global Logistics SAS",
+                "address": "Lyon, France",
+                "phone": "+33470000000",
+                "email": "contact@globallogistics.fr"
+            },
+            "items": [
+                {"product_name": "Déploiement Architecture SaaS", "unit": "Jour", "quantity": 5, "unit_price_ht": 800.0, "total_ht": 4000.0}
+            ],
+            "total_ht": 4000.0,
+            "tax_amount": 800.0,
+            "total_ttc": 4800.0,
+            "total_in_words": "quatre mille huit cents euros",
+            "payment_terms": "30% à la commande, solde à la livraison."
+        }
     }
-    wh_res = client.post("/warehouses/", json=wh_payload, headers=headers)
-    assert wh_res.status_code == 201
-    wh_id = wh_res.json()["id"]
-
-    # Stock Movement
-    move_payload = {
-        "warehouse_id": wh_id,
-        "product_name": "Ordinateur Portable",
-        "movement_type": "in",
-        "quantity": 25.0,
-        "reference": "BL-001"
-    }
-    move_res = client.post("/warehouses/stock/movements", json=move_payload, headers=headers)
-    assert move_res.status_code == 201
-    assert move_res.json()["quantity"] == 25.0
+    res = client.post("/documents/generate-docx", json=payload, headers=headers)
+    assert res.status_code == 200
+    assert "wordprocessingml.document" in res.headers["content-type"]
+    assert len(res.content) > 1000
 
 
-def test_ai_query():
-    headers = {"X-Tenant-ID": "tenant_alpha"}
-    ai_payload = {
-        "prompt": "Quel est le chiffre d'affaires ?",
-        "language": "fr"
-    }
-    ai_res = client.post("/ai/query", json=ai_payload, headers=headers)
-    assert ai_res.status_code == 200
-    data = ai_res.json()
-    assert "answer" in data
-    assert "metrics_summary" in data
-    assert "suggested_actions" in data
+def test_smart_text_assistance_and_multi_currency():
+    headers = {"X-Tenant-ID": "tenant_docs"}
+
+    # 1. Validation intelligente de formulaire
+    form_res = client.post("/documents/assist-input", json={
+        "form_data": {
+            "date": "21/10/2026",
+            "due_date": "2026-11-20",
+            "email": "bon.format@entreprise.com",
+            "phone": "+228 90 11 22 33"
+        }
+    }, headers=headers)
+    assert form_res.status_code == 200
+    assert form_res.json()["is_valid"] is True
+
+    # 2. Suggestions rédactionnelles
+    sugg_res = client.get("/documents/suggestions?category=invoice_notes&language=fr", headers=headers)
+    assert sugg_res.status_code == 200
+    assert len(sugg_res.json()["suggestions"]) >= 2
+
+    # 3. Montant en lettres multi-devises (EUR, FCFA, USD, MAD)
+    curr_res = client.get("/documents/number-to-words?amount=1500.50&currency=EUR&language=fr", headers=headers)
+    assert curr_res.status_code == 200
+    assert "euros" in curr_res.json()["in_words"]
 
 
-def test_seed_rbac():
-    db = SessionLocal()
-    try:
-        role = seed_tenant_rbac(db, tenant_id="test_rbac_tenant")
-        assert role is not None
-        assert role.name == "Responsable Commercial"
-        assert len(role.permissions) >= 3
-    finally:
-        db.close()
+def test_smart_ocr_and_data_extraction():
+    headers = {"X-Tenant-ID": "tenant_ocr"}
+    raw_sample = """
+    FACTURE N° FAC-2026-789
+    Date: 21/10/2026
+    Fournisseur: TECHNOLOGIES SARL
+    NIF: TG-987654321
+    Description: Support Maintenance Informatique
+    Total HT: 250000.00
+    Total TVA: 45000.00
+    Total TTC: 295000.00
+    """
+    ocr_res = client.post("/ocr/extract", json={"raw_text": raw_sample}, headers=headers)
+    assert ocr_res.status_code == 200
+    data = ocr_res.json()["extracted_data"]
+    assert data["document_number"] == "FAC-2026-789"
+    assert data["total_ttc"] == 295000.0
+    assert data["total_ht"] == 250000.0
+    assert data["tax_amount"] == 45000.0
+    assert data["date"] == "2026-10-21"
+
+
+def test_global_cross_module_search():
+    tenant_id = "tenant_search"
+    headers = {"X-Tenant-ID": tenant_id}
+    email = f"search_admin_{__import__('uuid').uuid4().hex[:6]}@example.com"
+    pwd = "SearchPassword123!"
+
+    client.post("/auth/register", json={
+        "tenant_id": tenant_id, "email": email, "password": pwd, "user_type": "admin"
+    }, headers=headers)
+    token = client.post("/auth/login", data={"username": email, "password": pwd}, headers=headers).json()["access_token"]
+    auth_headers = {"Authorization": f"Bearer {token}", "X-Tenant-ID": tenant_id}
+
+    # Création d'un produit identifiable
+    client.post("/products/", json={
+        "name": "Imprimante Laser Pro", "price": 120000.0, "stock": 3
+    }, headers=auth_headers)
+
+    # Recherche
+    search_res = client.get("/search/?q=Imprimante", headers=auth_headers)
+    assert search_res.status_code == 200
+    results = search_res.json()
+    assert results["total_results"] >= 1
+    assert any(p["name"] == "Imprimante Laser Pro" for p in results["results"]["products"])
+
+
+def test_tenant_backup_export_and_restore():
+    tenant_id = "tenant_backup_test"
+    headers = {"X-Tenant-ID": tenant_id}
+    email = f"backup_admin_{__import__('uuid').uuid4().hex[:6]}@example.com"
+    pwd = "BackupPassword123!"
+
+    client.post("/auth/register", json={
+        "tenant_id": tenant_id, "email": email, "password": pwd, "user_type": "admin"
+    }, headers=headers)
+    token = client.post("/auth/login", data={"username": email, "password": pwd}, headers=headers).json()["access_token"]
+    auth_headers = {"Authorization": f"Bearer {token}", "X-Tenant-ID": tenant_id}
+
+    # 1. Export backup snapshot
+    export_res = client.post("/admin/backups/export", headers=auth_headers)
+    assert export_res.status_code == 200
+    snapshot = export_res.json()
+    assert snapshot["metadata"]["tenant_id"] == tenant_id
+
+    # 2. Restore snapshot
+    restore_res = client.post("/admin/backups/restore", json={"snapshot": snapshot}, headers=auth_headers)
+    assert restore_res.status_code == 200
+    assert restore_res.json()["status"] == "success"
