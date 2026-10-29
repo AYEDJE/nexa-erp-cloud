@@ -1,28 +1,55 @@
-// auth-guard.js : Vérifie si l'utilisateur est authentifié avant d'afficher la page
 (function () {
-    const token = localStorage.getItem("access_token");
+  const token        = localStorage.getItem('access_token');
+  const refreshToken = localStorage.getItem('refresh_token');
+  const API          = 'http://127.0.0.1:8000';
 
-    // Si aucun token n'est trouvé, l'utilisateur n'est pas connecté
-    if (!token) {
-        window.location.href = "index.html";
-        return;
+  if (!token) {
+    window.location.href = 'index.html';
+    return;
+  }
+
+  function decodeJWT(t) {
+    try {
+      const payload = t.split('.')[1];
+      return JSON.parse(atob(payload));
+    } catch (e) {
+      return null;
     }
+  }
 
-    // Vérification optionnelle de la validité du token auprès de l'API FastAPI
-    fetch("http://localhost:8000/api/v1/auth/me", {
-        method: "GET",
-        headers: {
-            "Authorization": `Bearer ${token}`
-        }
-    })
-    .then(response => {
-        if (!response.ok) {
-            // Token expiré ou invalide -> suppression et redirection vers la connexion
-            localStorage.removeItem("access_token");
-            window.location.href = "index.html";
-        }
-    })
-    .catch(error => {
-        console.error("Erreur de connexion avec le serveur d'authentification :", error);
-    });
+  function tokenEstExpire(t) {
+    const payload = decodeJWT(t);
+    if (!payload || !payload.exp) return true;
+    return Date.now() >= payload.exp * 1000;
+  }
+
+  async function rafraichirToken() {
+    if (!refreshToken) return false;
+    try {
+      const res = await fetch(`${API}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken })
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      localStorage.setItem('access_token', data.access_token);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function verifier() {
+    if (tokenEstExpire(token)) {
+      const ok = await rafraichirToken();
+      if (!ok) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        window.location.href = 'index.html';
+      }
+    }
+  }
+
+  verifier();
 })();
