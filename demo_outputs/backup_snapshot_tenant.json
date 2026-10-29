@@ -1,0 +1,51 @@
+{
+  "metadata": {
+    "version": "2.0.0",
+    "tenant_id": "entreprise_demo",
+    "created_at": "2026-10-21T16:06:54.940273",
+    "checksum": "sha256_85c9b68fa43a4af89692a20a76506e9b"
+  },
+  "products": [
+    {
+      "name": "Licence ERP Cloud Annuelle",
+      "description": "Accès SaaS illimité multi-tenant",
+      "price": 500000.0,
+      "stock": 50
+    }
+  ],
+  "warehouses": [
+    {
+      "name": "Entrepôt Central Lomé Port",
+      "code": "WH-LOME-812",
+      "location": "Zone Franche Industrielle"
+    }
+  ],
+  "invoices": [
+    {
+      "doc_type": "INVOICE",
+      "number": "INV-20261021-3324",
+      "customer_name": "Société Ouest Africaine de Commerce",
+      "customer_email": "direction@commerce-afrique.com",
+      "total_ht": 1000000.0,
+      "tax_amount": 180000.0,
+      "total_ttc": 1180000.0,
+      "status": "DRAFT",
+      "language": "fr"
+    }
+  ],
+  "stock_movements": [
+    {
+      "product_name": "Serveur Dell PowerEdge R750",
+      "movement_type": "in",
+      "quantity": 10.0,
+      "reference": "BL-FOURNISSEUR-2026"
+    }
+  ],
+  "users": [
+    {
+      "email": "admin_demo_1792598808@nexacloud.tg",
+      "user_type": "admin",
+      "is_active": true
+    }
+  ]
+}

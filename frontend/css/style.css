@@ -1,0 +1,129 @@
+:root {
+  --primary:      #16a34a;   
+  --primary-dark: #15803d;   
+  --primary-light:#dcfce7;   
+  --sidebar-bg:   #14532d;   
+  --sidebar-text: #bbf7d0;   
+  --bg:           #f8fafc;   
+  --white:        #ffffff;
+  --text:         #1e293b;   
+  --text-light:   #64748b;  
+  --success:      #16a34a;  
+  --danger:       #dc2626;   
+  --warning:      #d97706;   
+  --border:       #e2e8f0;
+  --radius:       10px;
+  --shadow:       0 2px 10px rgba(0,0,0,0.07);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul {
+  list-style: none;
+}
+
+.login-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #f8fafc;  /* fond uni sobre, blanc cassé */
+}
+
+.login-box {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 48px 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+  border-top: 4px solid var(--primary); /* ligne verte en haut */
+}
+
+/* Logo */
+.login-logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-logo h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.login-logo h1 span {
+  color: var(--primary); /* "ERP" en vert */
+}
+
+.login-logo p {
+  color: var(--text-light);
+  margin-top: 4px;
+}
+
+/* Champs */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  background: #f8fafc;
+}
+
+.form-group input:focus {
+  border-color: var(--primary); /* bordure verte au focus */
+  background: var(--white);
+}
+
+/* Bouton */
+.btn-login {
+  width: 100%;
+  padding: 14px;
+  background: var(--primary);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.btn-login:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px); /* légère élévation au hover */
+}
+
+.btn-login:active {
+  transform: translateY(0);
+}

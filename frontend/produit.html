@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA ERP — Gestion des Produits</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .table-container { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); margin-top: 10px; }
+    .data-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .data-table th, .data-table td { padding: 12px 15px; border-bottom: 1px solid #e5e7eb; }
+    .data-table th { background-color: #f9fafb; font-weight: 600; color: #4b5563; font-size: 13px; }
+    .data-table tr:hover { background-color: #f8fafc; }
+    .btn-primary { background: #1a73e8; color: #fff; border: none; padding: 9px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+    .btn-primary:hover { background: #1557b0; }
+    .btn-icon { background: none; border: none; cursor: pointer; font-size: 15px; padding: 6px 10px; border-radius: 4px; }
+    .btn-icon:hover { background: #fee2e2; }
+    
+    .quick-nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .quick-nav-btn.secondary {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+    }
+    .quick-nav-btn.secondary:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .stock-pill { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; display: inline-block; }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-warning { background: #fef9c3; color: #854d0e; }
+    .badge-danger { background: #fee2e2; color: #991b1b; }
+
+    /* Fenêtre modale */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
+    .modal-content { background: #fff; margin: 7% auto; padding: 25px 30px; border-radius: 10px; width: 460px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .close-btn { position: absolute; right: 18px; top: 15px; font-size: 24px; cursor: pointer; color: #6b7280; }
+    .close-btn:hover { color: #111; }
+    .form-group { margin-bottom: 16px; display: flex; flex-direction: column; }
+    .form-group label { margin-bottom: 6px; font-weight: 600; font-size: 13px; color: #374151; }
+    .form-group input, .form-group textarea { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+    .form-group input:focus, .form-group textarea:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 3px rgba(26,115,232,0.15); }
+  </style>
+</head>
+
+<body>
+  <script>
+    if (!localStorage.getItem('access_token')) {
+      window.location.href = 'index.html';
+    }
+  </script>
+
+  <div class="app">
+    <!-- Barre latérale -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <h2>NEXA <span>ERP</span></h2>
+        <small>Votre gestion, notre solution</small>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul>
+          <li>
+            <a href="dashboard.html"><i class="fa-solid fa-house"></i> <span data-i18n="nav_dashboard">Tableau de bord</span></a>
+          </li>
+          <li>
+            <a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span data-i18n="nav_invoices">Ventes & Factures</span></a>
+          </li>
+          <li class="active">
+            <a href="produit.html"><i class="fa-solid fa-box-open"></i> <span data-i18n="nav_products">Produits & Articles</span></a>
+          </li>
+          <li>
+            <a href="clients.html"><i class="fa-solid fa-users"></i> <span data-i18n="nav_clients">Clients</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-cart-shopping"></i> <span data-i18n="nav_purchases">Achats</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-coins"></i> <span data-i18n="nav_treasury">Paiements & Trésorerie</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-industry"></i> <span data-i18n="nav_suppliers">Fournisseurs</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-warehouse"></i> <span data-i18n="nav_warehouses">Stock & Entrepôts</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-chart-line"></i> <span data-i18n="nav_reports">Rapports & Stats</span></a>
+          </li>
+        </ul>
+
+        <p class="nav-section-title" data-i18n="nav_settings">PARAMÈTRES</p>
+        <ul>
+          <li><a href="#"><i class="fa-solid fa-building"></i> <span data-i18n="nav_company">Société</span></a></li>
+          <li>
+            <a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span data-i18n="nav_users">Utilisateurs & Rôles</span></a>
+          </li>
+          <li><a href="#"><i class="fa-solid fa-gear"></i> <span data-i18n="nav_general_settings">Paramètres généraux</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Contenu Principal -->
+    <div class="main">
+      <header class="topbar">
+        <button id="toggle-sidebar">☰</button>
+        <h3 data-i18n="products_title">Produits & Catalogue</h3>
+
+        <div class="topbar-right">
+          <!-- NAVIGATION RAPIDE -->
+          <a href="dashboard.html" class="quick-nav-btn secondary" title="Retourner au Tableau de bord">
+            <i class="fa-solid fa-arrow-left"></i> <span data-i18n="topbar_dashboard">Dashboard</span>
+          </a>
+          <a href="factures.html" class="quick-nav-btn secondary" title="Aller aux factures">
+            <i class="fa-solid fa-file-invoice"></i> <span data-i18n="topbar_invoices">Factures</span>
+          </a>
+          <a href="clients.html" class="quick-nav-btn secondary" title="Gérer les clients">
+            <i class="fa-solid fa-users"></i> Clients
+          </a>
+          <a href="utilisateurs.html" class="quick-nav-btn secondary" title="Gérer les utilisateurs">
+            <i class="fa-solid fa-user-shield"></i> <span data-i18n="topbar_users">Utilisateurs</span>
+          </a>
+
+          <button id="open-add-modal" class="btn-primary">
+            <i class="fa-solid fa-plus"></i> <span data-i18n="btn_new_product">Nouveau Produit</span>
+          </button>
+
+          <!-- PROFIL UTILISATEUR DYNAMIQUE -->
+          <div class="user-info">
+            <img id="user-avatar" src="https://ui-avatars.com/api/?name=Admin&background=1a73e8&color=fff" alt="avatar">
+            <span id="user-display-name">Admin</span>
+          </div>
+          <button id="btn-logout" data-i18n="btn_logout">Déconnexion</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="table-container">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+            <h4 data-i18n="products_subtitle" style="margin:0; font-size:16px; color:#1f2937;">Catalogue des articles en vente</h4>
+            <span style="font-size:13px; color:#6b7280;">Prix TTC en Euros / Devises</span>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-i18n="th_id" style="width: 70px;">ID</th>
+                <th data-i18n="th_name">Désignation</th>
+                <th data-i18n="th_description">Description</th>
+                <th data-i18n="th_price">Prix unitaire</th>
+                <th data-i18n="th_stock">Stock disponible</th>
+                <th data-i18n="th_actions" style="width: 80px; text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="products-table-body">
+              <tr><td colspan="6" style="text-align:center; padding: 20px;">Chargement des produits...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Fenêtre Modale d'Ajout de Produit -->
+  <div id="product-modal" class="modal">
+    <div class="modal-content">
+      <span id="close-modal" class="close-btn">&times;</span>
+      <h3 id="modal-title" style="margin-top:0; color:#111827;">Nouveau Produit</h3>
+      <form id="product-form">
+        <input type="hidden" id="product-id">
+        <div class="form-group">
+          <label for="name">Désignation du produit *</label>
+          <input type="text" id="name" required placeholder="Ex: Ordinateur Portable HP ProBook">
+        </div>
+        <div class="form-group">
+          <label for="description">Description technique</label>
+          <textarea id="description" rows="3" placeholder="Caractéristiques, garantie, modèle..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="price">Prix unitaire (€) *</label>
+          <input type="number" id="price" step="0.01" min="0" required placeholder="Ex: 599.99">
+        </div>
+        <div class="form-group">
+          <label for="stock">Quantité initiale en stock</label>
+          <input type="number" id="stock" min="0" value="10">
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px; margin-top: 10px;">
+          <i class="fa-solid fa-check"></i> Enregistrer le produit
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/produit.js"></script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA ERP — Ventes & Facturation</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .table-container { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); margin-top: 10px; }
+    .data-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .data-table th, .data-table td { padding: 12px 14px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+    .data-table th { background-color: #f9fafb; font-weight: 600; color: #4b5563; }
+    .data-table tr:hover { background-color: #f8fafc; }
+    
+    .btn-primary { background: #1a73e8; color: #fff; border: none; padding: 9px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+    .btn-primary:hover { background: #1557b0; }
+
+    .quick-nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .quick-nav-btn.secondary {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+    }
+    .quick-nav-btn.secondary:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .btn-action {
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #374151;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-action:hover { background: #e5e7eb; }
+    .btn-action.pdf { color: #dc2626; border-color: #fca5a5; background: #fef2f2; }
+    .btn-action.pdf:hover { background: #fee2e2; }
+
+    .status-pill { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .status-paid { background: #dcfce7; color: #166534; }
+    .status-pending { background: #fef9c3; color: #854d0e; }
+    .status-draft { background: #f1f5f9; color: #475569; }
+
+    /* Fenêtre modale */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); overflow-y: auto; }
+    .modal-content { background: #fff; margin: 4% auto; padding: 25px 30px; border-radius: 10px; width: 560px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .close-btn { position: absolute; right: 18px; top: 15px; font-size: 24px; cursor: pointer; color: #6b7280; }
+    .form-group { margin-bottom: 14px; display: flex; flex-direction: column; }
+    .form-group label { margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #374151; }
+    .form-group input, .form-group select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  </style>
+</head>
+
+<body>
+  <script>
+    if (!localStorage.getItem('access_token')) {
+      window.location.href = 'index.html';
+    }
+  </script>
+
+  <div class="app">
+    <!-- Barre latérale -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <h2>NEXA <span>ERP</span></h2>
+        <small>Votre gestion, notre solution</small>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul>
+          <li>
+            <a href="dashboard.html"><i class="fa-solid fa-house"></i> <span data-i18n="nav_dashboard">Tableau de bord</span></a>
+          </li>
+          <li class="active">
+            <a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span data-i18n="nav_invoices">Ventes & Factures</span></a>
+          </li>
+          <li>
+            <a href="produit.html"><i class="fa-solid fa-box-open"></i> <span data-i18n="nav_products">Produits & Articles</span></a>
+          </li>
+          <li>
+            <a href="clients.html"><i class="fa-solid fa-users"></i> <span data-i18n="nav_clients">Clients</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-cart-shopping"></i> <span data-i18n="nav_purchases">Achats</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-coins"></i> <span data-i18n="nav_treasury">Paiements & Trésorerie</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-industry"></i> <span data-i18n="nav_suppliers">Fournisseurs</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-warehouse"></i> <span data-i18n="nav_warehouses">Stock & Entrepôts</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-chart-line"></i> <span data-i18n="nav_reports">Rapports & Stats</span></a>
+          </li>
+        </ul>
+
+        <p class="nav-section-title" data-i18n="nav_settings">PARAMÈTRES</p>
+        <ul>
+          <li><a href="#"><i class="fa-solid fa-building"></i> <span data-i18n="nav_company">Société</span></a></li>
+          <li>
+            <a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span data-i18n="nav_users">Utilisateurs & Rôles</span></a>
+          </li>
+          <li><a href="#"><i class="fa-solid fa-gear"></i> <span data-i18n="nav_general_settings">Paramètres généraux</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Contenu Principal -->
+    <div class="main">
+      <header class="topbar">
+        <button id="toggle-sidebar">☰</button>
+        <h3 data-i18n="invoices_title">Ventes & Facturation</h3>
+
+        <div class="topbar-right">
+          <!-- NAVIGATION RAPIDE -->
+          <a href="dashboard.html" class="quick-nav-btn secondary" title="Retourner au Tableau de bord">
+            <i class="fa-solid fa-arrow-left"></i> <span data-i18n="topbar_dashboard">Dashboard</span>
+          </a>
+          <a href="produit.html" class="quick-nav-btn secondary" title="Catalogue Produits">
+            <i class="fa-solid fa-box-open"></i> <span data-i18n="topbar_products">Produits</span>
+          </a>
+          <a href="clients.html" class="quick-nav-btn secondary" title="Gérer les clients">
+            <i class="fa-solid fa-users"></i> Clients
+          </a>
+          <a href="utilisateurs.html" class="quick-nav-btn secondary" title="Gérer les utilisateurs">
+            <i class="fa-solid fa-user-shield"></i> <span data-i18n="topbar_users">Utilisateurs</span>
+          </a>
+
+          <button id="open-invoice-modal" class="btn-primary">
+            <i class="fa-solid fa-plus"></i> <span data-i18n="btn_new_invoice">Nouvelle Facture</span>
+          </button>
+
+          <!-- PROFIL UTILISATEUR DYNAMIQUE -->
+          <div class="user-info">
+            <img id="user-avatar" src="https://ui-avatars.com/api/?name=Admin&background=1a73e8&color=fff" alt="avatar">
+            <span id="user-display-name">Admin</span>
+          </div>
+          <button id="btn-logout" data-i18n="btn_logout">Déconnexion</button>
+        </div>
+      </header>
+
+      <main class="content">
+
+        <!-- RÉSUMÉ KPI VENTES -->
+        <section class="kpi-section" style="grid-template-columns: repeat(3, 1fr);">
+          <div class="kpi-card">
+            <p data-i18n="kpi_total_invoiced">Total Facturé (TTC)</p>
+            <h2 id="kpi-total-ttc">0.00 €</h2>
+          </div>
+          <div class="kpi-card">
+            <p data-i18n="kpi_paid_invoices">Factures Payées</p>
+            <h2 id="kpi-count-payees">0</h2>
+          </div>
+          <div class="kpi-card">
+            <p data-i18n="kpi_pending_invoices">Factures En Attente / Brouillons</p>
+            <h2 id="kpi-count-attente">0</h2>
+          </div>
+        </section>
+
+        <!-- TABLEAU DES FACTURES -->
+        <div class="table-container">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+            <h4 data-i18n="invoices_subtitle" style="margin:0; font-size:16px; color:#1f2937;">Liste des factures et devis émis</h4>
+            <span style="font-size:13px; color:#6b7280;">Téléchargement PDF en direct avec montant en toutes lettres</span>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-i18n="th_doc_num">N° Document</th>
+                <th data-i18n="th_type">Type</th>
+                <th data-i18n="th_customer">Client</th>
+                <th data-i18n="th_total_ht">Total HT</th>
+                <th data-i18n="th_total_ttc">Total TTC</th>
+                <th data-i18n="th_status">Statut</th>
+                <th data-i18n="th_actions" style="text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="invoices-table-body">
+              <tr><td colspan="7" style="text-align:center; padding: 20px;">Chargement des factures...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Fenêtre Modale d'Émission de Facture -->
+  <div id="invoice-modal" class="modal">
+    <div class="modal-content">
+      <span id="close-modal" class="close-btn">&times;</span>
+      <h3 style="margin-top:0; color:#111827;"><i class="fa-solid fa-file-invoice-dollar" style="color:#1a73e8;"></i> Émettre une facture</h3>
+      
+      <form id="invoice-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="doc-type">Type de document</label>
+            <select id="doc-type">
+              <option value="FACTURE">Facture de Vente</option>
+              <option value="DEVIS">Devis Commercial</option>
+              <option value="COMMANDE">Bon de Commande</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="inv-lang">Langue du document</label>
+            <select id="inv-lang">
+              <option value="fr">Français (FR)</option>
+              <option value="en">Anglais (EN)</option>
+              <option value="ar">Arabe (AR)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="customer-name">Nom du client *</label>
+            <input type="text" id="customer-name" required placeholder="Ex: Société Alpha SARL">
+          </div>
+          <div class="form-group">
+            <label for="customer-email">Email client</label>
+            <input type="email" id="customer-email" placeholder="contact@alpha.com">
+          </div>
+        </div>
+
+        <hr style="border:none; border-top:1px solid #e5e7eb; margin: 15px 0;">
+        <h4 style="margin: 0 0 10px 0; font-size:14px; color:#374151;">Ligne de produit ou service</h4>
+
+        <div class="form-group">
+          <label for="item-name">Désignation de la prestation / article *</label>
+          <input type="text" id="item-name" required placeholder="Ex: Licence ERP Cloud - 1 An">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="item-qty">Quantité *</label>
+            <input type="number" id="item-qty" min="1" value="1" required>
+          </div>
+          <div class="form-group">
+            <label for="item-price">Prix unitaire HT (€) *</label>
+            <input type="number" id="item-price" step="0.01" min="0" required placeholder="Ex: 450.00">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="item-tva">Taux TVA (%)</label>
+            <input type="number" id="item-tva" step="0.1" value="19.0">
+          </div>
+          <div class="form-group">
+            <label for="payment-terms">Conditions de règlement</label>
+            <input type="text" id="payment-terms" value="Paiement à 30 jours">
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px; margin-top: 15px;">
+          <i class="fa-solid fa-file-pdf"></i> Créer et Générer la Facture
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/factures.js"></script>
+</body>
+</html>

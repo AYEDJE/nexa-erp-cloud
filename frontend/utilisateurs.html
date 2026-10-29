@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA ERP — Utilisateurs & Rôles</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .table-container { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); margin-top: 10px; }
+    .data-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .data-table th, .data-table td { padding: 12px 14px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+    .data-table th { background-color: #f9fafb; font-weight: 600; color: #4b5563; }
+    .data-table tr:hover { background-color: #f8fafc; }
+    
+    .btn-primary { background: #1a73e8; color: #fff; border: none; padding: 9px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+    .btn-primary:hover { background: #1557b0; }
+
+    .quick-nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .quick-nav-btn.secondary {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+    }
+    .quick-nav-btn.secondary:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .role-badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; display: inline-block; }
+    .role-admin { background: #fee2e2; color: #991b1b; }
+    .role-commercial { background: #dbeafe; color: #1e40af; }
+    .role-finance { background: #f3e8ff; color: #6b21a8; }
+    .role-stock { background: #ffedd5; color: #9a3412; }
+    .role-external { background: #dcfce7; color: #166534; }
+    .role-staff { background: #f1f5f9; color: #475569; }
+
+    .status-pill { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .status-active { background: #dcfce7; color: #166534; }
+    .status-inactive { background: #fee2e2; color: #991b1b; }
+
+    /* Modale */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); overflow-y: auto; }
+    .modal-content { background: #fff; margin: 5% auto; padding: 25px 30px; border-radius: 10px; width: 500px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .close-btn { position: absolute; right: 18px; top: 15px; font-size: 24px; cursor: pointer; color: #6b7280; }
+    .form-group { margin-bottom: 14px; display: flex; flex-direction: column; }
+    .form-group label { margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #374151; }
+    .form-group input, .form-group select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  </style>
+</head>
+
+<body>
+  <script>
+    if (!localStorage.getItem('access_token')) {
+      window.location.href = 'index.html';
+    }
+  </script>
+
+  <div class="app">
+    <!-- Barre latérale -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <h2>NEXA <span>ERP</span></h2>
+        <small>Votre gestion, notre solution</small>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul>
+          <li>
+            <a href="dashboard.html"><i class="fa-solid fa-house"></i> <span data-i18n="nav_dashboard">Tableau de bord</span></a>
+          </li>
+          <li>
+            <a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span data-i18n="nav_invoices">Ventes & Factures</span></a>
+          </li>
+          <li>
+            <a href="produit.html"><i class="fa-solid fa-box-open"></i> <span data-i18n="nav_products">Produits & Articles</span></a>
+          </li>
+          <li>
+            <a href="clients.html"><i class="fa-solid fa-users"></i> <span data-i18n="nav_clients">Clients</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-cart-shopping"></i> <span data-i18n="nav_purchases">Achats</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-coins"></i> <span data-i18n="nav_treasury">Paiements & Trésorerie</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-industry"></i> <span data-i18n="nav_suppliers">Fournisseurs</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-warehouse"></i> <span data-i18n="nav_warehouses">Stock & Entrepôts</span></a>
+          </li>
+          <li>
+            <a href="#"><i class="fa-solid fa-chart-line"></i> <span data-i18n="nav_reports">Rapports & Stats</span></a>
+          </li>
+        </ul>
+
+        <p class="nav-section-title" data-i18n="nav_settings">PARAMÈTRES</p>
+        <ul>
+          <li><a href="#"><i class="fa-solid fa-building"></i> <span data-i18n="nav_company">Société</span></a></li>
+          <li class="active">
+            <a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span data-i18n="nav_users">Utilisateurs & Rôles</span></a>
+          </li>
+          <li><a href="#"><i class="fa-solid fa-gear"></i> <span data-i18n="nav_general_settings">Paramètres généraux</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Contenu Principal -->
+    <div class="main">
+      <header class="topbar">
+        <button id="toggle-sidebar">☰</button>
+        <h3 data-i18n="users_title">Gestion des Collaborateurs & Accès</h3>
+
+        <div class="topbar-right">
+          <!-- NAVIGATION RAPIDE -->
+          <a href="dashboard.html" class="quick-nav-btn secondary" title="Retourner au Tableau de bord">
+            <i class="fa-solid fa-arrow-left"></i> <span data-i18n="topbar_dashboard">Dashboard</span>
+          </a>
+          <a href="produit.html" class="quick-nav-btn secondary">
+            <i class="fa-solid fa-box-open"></i> <span data-i18n="topbar_products">Produits</span>
+          </a>
+          <a href="factures.html" class="quick-nav-btn secondary">
+            <i class="fa-solid fa-file-invoice"></i> <span data-i18n="topbar_invoices">Factures</span>
+          </a>
+          <a href="clients.html" class="quick-nav-btn secondary" title="Gérer les clients">
+            <i class="fa-solid fa-users"></i> Clients
+          </a>
+
+          <button id="open-user-modal" class="btn-primary">
+            <i class="fa-solid fa-user-plus"></i> <span data-i18n="btn_new_user">Inscrire un Utilisateur</span>
+          </button>
+
+          <!-- PROFIL UTILISATEUR DYNAMIQUE -->
+          <div class="user-info">
+            <img id="user-avatar" src="https://ui-avatars.com/api/?name=Admin&background=1a73e8&color=fff" alt="avatar">
+            <span id="user-display-name">Admin</span>
+          </div>
+          <button id="btn-logout" data-i18n="btn_logout">Déconnexion</button>
+        </div>
+      </header>
+
+      <main class="content">
+
+        <!-- KPI UTILISATEURS -->
+        <section class="kpi-section" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="kpi-card">
+            <p data-i18n="kpi_total_users">Total Utilisateurs</p>
+            <h2 id="kpi-total-users">0</h2>
+          </div>
+          <div class="kpi-card">
+            <p data-i18n="kpi_internal_staff">Collaborateurs Internes</p>
+            <h2 id="kpi-staff-count">0</h2>
+          </div>
+          <div class="kpi-card">
+            <p data-i18n="kpi_external_portals">Portails Tiers (Clients/Fournisseurs)</p>
+            <h2 id="kpi-external-count">0</h2>
+          </div>
+          <div class="kpi-card">
+            <p data-i18n="kpi_mfa_active">Sécurité 2FA / MFA Active</p>
+            <h2 id="kpi-mfa-count">0</h2>
+          </div>
+        </section>
+
+        <!-- TABLEAU DES UTILISATEURS -->
+        <div class="table-container">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+            <h4 data-i18n="users_subtitle" style="margin:0; font-size:16px; color:#1f2937;">Comptes & Permissions de l'Entreprise</h4>
+            <span style="font-size:13px; color:#6b7280;">Contrôle RBAC à 6 niveaux de permission</span>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 60px;">ID</th>
+                <th data-i18n="th_email_id">Email / Identifiant</th>
+                <th data-i18n="th_role">Rôle Fonctionnel</th>
+                <th data-i18n="th_scope">Périmètre</th>
+                <th data-i18n="th_2fa">Sécurité 2FA</th>
+                <th style="width: 90px;">Statut</th>
+                <th style="width: 100px; text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="users-table-body">
+              <tr><td colspan="7" style="text-align:center; padding: 20px;">Chargement des comptes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Fenêtre Modale d'Inscription d'un Utilisateur -->
+  <div id="user-modal" class="modal">
+    <div class="modal-content">
+      <span id="close-modal" class="close-btn">&times;</span>
+      <h3 style="margin-top:0; color:#111827;"><i class="fa-solid fa-user-plus" style="color:#1a73e8;"></i> Inscrire un collaborateur ou tiers</h3>
+      
+      <form id="user-form">
+        <div class="form-group">
+          <label for="new-email">Email professionnel de connexion *</label>
+          <input type="email" id="new-email" required placeholder="collaborateur@entreprise.com">
+        </div>
+
+        <div class="form-group">
+          <label for="new-role">Rôle & Profil fonctionnel (selon le cahier des charges) *</label>
+          <select id="new-role">
+            <optgroup label="Profils Collaborateurs Internes">
+              <option value="commercial" selected>💼 Responsable Commercial (Devis, Ventes, Facturation)</option>
+              <option value="finance">💰 Responsable Financier et Comptable (Trésorerie, OCR)</option>
+              <option value="stock">📦 Responsable des Stocks et Magasinier (Entrepôts)</option>
+              <option value="achats">🛒 Responsable des Achats (Fournisseurs, BC)</option>
+              <option value="staff">👤 Collaborateur Standard (Consultation)</option>
+              <option value="admin">🔒 Administrateur Adjoint (Tous droits)</option>
+            </optgroup>
+            <optgroup label="Portails Utilisateurs Externes Sécurisés">
+              <option value="client_ext">🌐 Client Partenaire (Consultation Devis/Factures)</option>
+              <option value="supplier_ext">🏭 Fournisseur Agréé (Bons de Commande)</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="new-password">Mot de passe initial *</label>
+            <input type="password" id="new-password" required placeholder="••••••••">
+          </div>
+          <div class="form-group">
+            <label for="confirm-user-password">Confirmer mot de passe *</label>
+            <input type="password" id="confirm-user-password" required placeholder="••••••••">
+          </div>
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; margin-bottom:14px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#334155; cursor:pointer;">
+            <input type="checkbox" id="force-password-change" checked>
+            <span>Exiger le renouvellement du mot de passe à la 1ère connexion</span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px;">
+          <i class="fa-solid fa-check"></i> Créer et Activer le compte
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/utilisateurs.js"></script>
+</body>
+</html>
