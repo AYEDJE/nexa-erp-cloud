@@ -40,12 +40,11 @@
     }
   }
 
-  async function verifier() {
+   async function verifier() {
     if (tokenEstExpire(token)) {
       const ok = await rafraichirToken();
       if (!ok) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
+        localStorage.clear();              // ← vide tout, pas juste les tokens
         window.location.href = 'index.html';
       }
     }

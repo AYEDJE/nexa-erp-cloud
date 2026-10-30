@@ -127,3 +127,32 @@ ul {
 .btn-login:active {
   transform: translateY(0);
 }
+
+.login-footer {
+  margin-top: 20px;
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.login-footer p {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 10px;
+}
+
+.btn-register {
+  display: inline-block;
+  padding: 10px 24px;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+
+.btn-register:hover {
+  background: var(--primary);
+  color: var(--white);
+}

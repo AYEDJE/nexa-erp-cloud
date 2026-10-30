@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 1500);
 
     } catch (err) {
-      showAlert('Impossible de joindre le serveur. Vérifiez que le backend est démarré.');
+      showAlert('Impossible de joindre le serveur. Vérifiez que le backend est démarré : uvicorn app.main:app --reload');
       setBoutonChargement(false);
     }
   });
