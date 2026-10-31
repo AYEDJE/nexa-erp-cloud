@@ -285,6 +285,60 @@
     </div>
   </div>
 
+  <!-- Fenêtre de paiement -->
+  <div id="pay-modal" class="modal">
+    <div class="modal-content" style="width: 460px;">
+      <span class="close-btn" id="pay-close">&times;</span>
+      <h3 style="margin-top:0;">Régler la facture <span id="pay-invoice-number"></span></h3>
+      <p style="margin:0 0 16px; color:#64748b; font-size:13px;">Client : <strong id="pay-customer"></strong></p>
+
+      <form id="pay-form">
+        <div class="form-group">
+          <label for="pay-amount">Montant à régler (TTC)</label>
+          <input type="text" id="pay-amount" readonly style="background:#f9fafb; font-weight:700;">
+        </div>
+
+        <div class="form-group">
+          <label for="pay-method">Moyen de paiement</label>
+          <select id="pay-method">
+            <optgroup label="Encaissement manuel">
+              <option value="cash">Espèces</option>
+              <option value="bank_transfer">Virement bancaire</option>
+              <option value="cheque">Chèque</option>
+              <option value="mobile_money">Mobile Money (reçu)</option>
+            </optgroup>
+            <optgroup label="Paiement en ligne">
+              <option value="online">Carte / Mobile Money en ligne</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <div id="pay-manual-fields">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="pay-date">Date du paiement</label>
+              <input type="date" id="pay-date">
+            </div>
+            <div class="form-group">
+              <label for="pay-reference">Référence</label>
+              <input type="text" id="pay-reference" placeholder="N° chèque, ID transaction...">
+            </div>
+          </div>
+        </div>
+
+        <p id="pay-online-info" style="display:none; background:#eff6ff; color:#1e40af; padding:10px 12px; border-radius:6px; font-size:13px;">
+          Vous allez être redirigé vers la page de paiement sécurisée. La facture passera en « Payée » automatiquement une fois le paiement confirmé.
+        </p>
+
+        <p id="pay-error" style="color:#dc2626; font-size:13px; display:none;"></p>
+
+        <button type="submit" id="pay-submit" class="btn-primary" style="width:100%; justify-content:center; padding:12px; font-size:14px; margin-top:6px;">
+          <i class="fa-solid fa-check"></i> Enregistrer le paiement
+        </button>
+      </form>
+    </div>
+  </div>
+  
   <script src="js/auth.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/factures.js"></script>
