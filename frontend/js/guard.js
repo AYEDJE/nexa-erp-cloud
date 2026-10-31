@@ -9,12 +9,14 @@
   }
 
   if (token.startsWith('demo_')) {
+    localStorage.clear();
+    window.location.href = 'index.html';
     return;
   }
 
   function decodeJWT(t) {
     try {
-      const payload = t.split('.')[1];
+      const payload = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
       return JSON.parse(atob(payload));
     } catch (e) {
       return null;
@@ -44,11 +46,11 @@
     }
   }
 
-   async function verifier() {
+  async function verifier() {
     if (tokenEstExpire(token)) {
       const ok = await rafraichirToken();
       if (!ok) {
-        localStorage.clear();              // ← vide tout, pas juste les tokens
+        localStorage.clear();
         window.location.href = 'index.html';
       }
     }
