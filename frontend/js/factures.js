@@ -1,5 +1,3 @@
-const API = 'http://127.0.0.1:8000';
-
 document.addEventListener("DOMContentLoaded", () => {
     const token = localStorage.getItem("access_token");
     if (!token) {
@@ -18,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const kpiCountAttente = document.getElementById("kpi-count-attente");
 
     const isDemo = token.startsWith("demo_");
+    let currentInvoices = [];
 
     function getDemoInvoices() {
         const stored = localStorage.getItem("demo_invoices");
@@ -111,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Affichage dans le tableau HTML
     function renderTable(invoices) {
+        currentInvoices = invoices || [];
         if (!invoices || invoices.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: #6b7280;">Aucune facture trouvée. Cliquez sur "Nouvelle Facture" pour en créer une.</td></tr>`;
             return;
@@ -138,6 +138,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td><strong style="color:#111827;">${Number(inv.total_ttc || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</strong></td>
                 <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
                 <td style="text-align: center;">
+                    ${canPay(inv) ? `<button class="btn-action pay" data-id="${inv.id}" title="Régler cette facture" style="margin-right:4px; color:#166534; border-color:#bbf7d0;">
+                        <i class="fa-solid fa-money-bill-wave"></i> Régler
+                    </button>` : ''}
                     <button class="btn-action pdf" data-id="${inv.id}" data-number="${inv.number}" title="Télécharger le PDF officiel">
                         <i class="fa-solid fa-file-pdf"></i> PDF
                     </button>
@@ -145,6 +148,10 @@ document.addEventListener("DOMContentLoaded", () => {
             </tr>
             `;
         }).join("");
+
+        document.querySelectorAll(".btn-action.pay").forEach(btn => {
+            btn.addEventListener("click", () => openPayModal(btn.dataset.id));
+        });
 
         // Écouteurs pour le téléchargement PDF
         document.querySelectorAll(".btn-action.pdf").forEach(btn => {
@@ -298,6 +305,129 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Erreur : " + error.message);
         }
     });
+
+    function canPay(inv) {
+        return (inv.doc_type || "FACTURE") === "FACTURE" && inv.status === "pending";
+    }
+
+    const payModal      = document.getElementById("pay-modal");
+    const payForm       = document.getElementById("pay-form");
+    const payMethod     = document.getElementById("pay-method");
+    const payManual     = document.getElementById("pay-manual-fields");
+    const payOnlineInfo = document.getElementById("pay-online-info");
+    const payError      = document.getElementById("pay-error");
+    const paySubmit     = document.getElementById("pay-submit");
+    let invoiceToPay    = null;
+
+    function formatMoney(n) {
+        return Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 }) + " €";
+    }
+
+    function updatePayMode() {
+        const online = payMethod.value === "online";
+        payManual.style.display = online ? "none" : "block";
+        payOnlineInfo.style.display = online ? "block" : "none";
+        paySubmit.innerHTML = online
+            ? '<i class="fa-solid fa-lock"></i> Payer en ligne'
+            : '<i class="fa-solid fa-check"></i> Enregistrer le paiement';
+    }
+
+    function openPayModal(invoiceId) {
+        invoiceToPay = currentInvoices.find(i => String(i.id) === String(invoiceId));
+        if (!invoiceToPay || !canPay(invoiceToPay)) return;
+
+        document.getElementById("pay-invoice-number").textContent = invoiceToPay.number;
+        document.getElementById("pay-customer").textContent = invoiceToPay.customer_name || "Client anonyme";
+        document.getElementById("pay-amount").value = formatMoney(invoiceToPay.total_ttc);
+        document.getElementById("pay-date").value = new Date().toISOString().slice(0, 10);
+        document.getElementById("pay-reference").value = "";
+        payMethod.value = "cash";
+        payError.style.display = "none";
+        updatePayMode();
+        payModal.style.display = "block";
+    }
+
+    function closePayModal() {
+        payModal.style.display = "none";
+        invoiceToPay = null;
+    }
+
+    payMethod.addEventListener("change", updatePayMode);
+    document.getElementById("pay-close").addEventListener("click", closePayModal);
+    window.addEventListener("click", (e) => { if (e.target === payModal) closePayModal(); });
+
+    payForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!invoiceToPay) return;
+
+        payError.style.display = "none";
+        paySubmit.disabled = true;
+        const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
+
+        try {
+            let res;
+            if (payMethod.value === "online") {
+                // Paiement en ligne : le backend crée la session chez le prestataire et renvoie l'URL de paiement
+                res = await fetch(`${API}/invoices/${invoiceToPay.id}/online-payment`, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({
+                        success_url: `${location.origin}${location.pathname}?payment=success`,
+                        cancel_url:  `${location.origin}${location.pathname}?payment=cancel`
+                    })
+                });
+            } else {
+                // Encaissement manuel : on enregistre le paiement reçu
+                res = await fetch(`${API}/invoices/${invoiceToPay.id}/payments`, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({
+                        method: payMethod.value,
+                        amount: Number(invoiceToPay.total_ttc),
+                        paid_at: document.getElementById("pay-date").value,
+                        reference: document.getElementById("pay-reference").value.trim() || null
+                    })
+                });
+            }
+
+            if (res.status === 401) {
+                localStorage.removeItem("access_token");
+                window.location.href = "index.html";
+                return;
+            }
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(typeof data.detail === "string" ? data.detail : "Le paiement a échoué.");
+            }
+
+            if (payMethod.value === "online") {
+                if (!data.payment_url) throw new Error("Lien de paiement indisponible.");
+                window.location.href = data.payment_url;
+                return;
+            }
+
+            closePayModal();
+            await fetchInvoices();
+            alert("Paiement enregistré : la facture est marquée comme payée.");
+        } catch (err) {
+            payError.textContent = err.message;
+            payError.style.display = "block";
+        } finally {
+            paySubmit.disabled = false;
+        }
+    });
+
+    // Retour depuis la page de paiement en ligne
+    const payResult = new URLSearchParams(location.search).get("payment");
+    if (payResult) {
+        history.replaceState(null, "", location.pathname);
+        if (payResult === "success") {
+            alert("Paiement reçu. La facture sera marquée « Payée » dès la confirmation du prestataire.");
+        } else if (payResult === "cancel") {
+            alert("Paiement annulé. La facture reste en attente.");
+        }
+    }
 
     fetchInvoices();
 
