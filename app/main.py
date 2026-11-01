@@ -8,6 +8,7 @@ from app.api.documents import router as documents_router
 from app.api.ocr import router as ocr_router
 from app.api.search import router as search_router
 from app.api.backups import router as backups_router
+from app.api.company import router as company_router
 from app.routers import auth
 
 from app.core.database import Base, engine
@@ -22,6 +23,7 @@ from app.models.rbac import PermissionORM, RoleORM
 from app.models.invoice import InvoiceItemORM, InvoiceORM
 from app.models.warehouse import StockMovementORM, WarehouseORM
 from app.models.security import UserSessionORM, UserDeviceORM, SecurityAlertORM
+from app.models.company import CompanyORM
 import app.models.audit
 
 Base.metadata.create_all(bind=engine)
@@ -55,7 +57,7 @@ app.include_router(ai.router)
 app.include_router(audit_router)
 app.include_router(security_admin_router)
 app.include_router(backups_router)
-
+app.include_router(company_router)
 allow_admin_only = RoleChecker(["admin", "super_admin"])
 
 
