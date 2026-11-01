@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA ERP — Société</title>
+  <script src="js/guard.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .btn-primary { background: #1a73e8; color: #fff; border: none; padding: 11px 22px; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+    .btn-primary:hover { background: #1557b0; }
+    .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+
+    .quick-nav-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; transition: all 0.2s ease; }
+    .quick-nav-btn.secondary { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+    .quick-nav-btn.secondary:hover { background: #e2e8f0; color: #0f172a; }
+
+    .co-wrap { max-width: 900px; }
+    .co-card { background: #fff; border-radius: 10px; padding: 22px 26px; margin-bottom: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+    .co-card h4 { margin: 0 0 16px; font-size: 15px; color: #1f2937; display: flex; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9; }
+    .co-card h4 i { color: #1a73e8; }
+    .form-group { margin-bottom: 14px; display: flex; flex-direction: column; }
+    .form-group label { margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #374151; }
+    .form-group input, .form-group select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+    .form-group input:focus, .form-group select:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 3px rgba(26,115,232,.15); }
+    .form-group small { color: #64748b; font-size: 11px; margin-top: 4px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 700px) { .form-row { grid-template-columns: 1fr; } }
+
+    .completeness { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 18px; display: flex; gap: 10px; align-items: flex-start; }
+    .completeness.ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .completeness.warn { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+
+    #co-alert { display: none; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; white-space: pre-line; }
+    #co-alert.success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    #co-alert.error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+  </style>
+</head>
+
+<body>
+  <script>
+    if (!localStorage.getItem('access_token')) { window.location.href = 'index.html'; }
+  </script>
+
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <h2>NEXA <span>ERP</span></h2>
+        <small>Votre gestion, notre solution</small>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul>
+          <li><a href="dashboard.html"><i class="fa-solid fa-house"></i> <span>Tableau de bord</span></a></li>
+          <li><a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Ventes & Factures</span></a></li>
+          <li><a href="produit.html"><i class="fa-solid fa-box-open"></i> <span>Produits & Articles</span></a></li>
+          <li><a href="clients.html"><i class="fa-solid fa-users"></i> <span>Clients</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-cart-shopping"></i> <span>Achats</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-coins"></i> <span>Paiements & Trésorerie</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-industry"></i> <span>Fournisseurs</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-warehouse"></i> <span>Stock & Entrepôts</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-chart-line"></i> <span>Rapports & Stats</span></a></li>
+        </ul>
+
+        <p class="nav-section-title">PARAMÈTRES</p>
+        <ul>
+          <li class="active"><a href="societe.html"><i class="fa-solid fa-building"></i> <span>Société</span></a></li>
+          <li><a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span>Utilisateurs & Rôles</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-gear"></i> <span>Paramètres généraux</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button id="toggle-sidebar">☰</button>
+        <h3>Ma Société</h3>
+
+        <div class="topbar-right">
+          <a href="dashboard.html" class="quick-nav-btn secondary">
+            <i class="fa-solid fa-arrow-left"></i> <span>Dashboard</span>
+          </a>
+          <a href="factures.html" class="quick-nav-btn secondary">
+            <i class="fa-solid fa-file-invoice"></i> <span>Factures</span>
+          </a>
+
+          <div class="user-info">
+            <img id="user-avatar" src="https://ui-avatars.com/api/?name=Admin&background=1a73e8&color=fff" alt="avatar">
+            <span id="user-display-name">Admin</span>
+          </div>
+          <button id="btn-logout">Déconnexion</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="co-wrap">
+          <p style="color:#64748b; font-size:13px; margin-bottom:14px;">
+            Ces informations apparaissent sur tous vos documents (factures, devis, bons de livraison…).
+          </p>
+
+          <div id="co-completeness" class="completeness warn" style="display:none;"></div>
+          <div id="co-alert"></div>
+
+          <form id="company-form" novalidate>
+
+            <div class="co-card">
+              <h4><i class="fa-solid fa-building"></i> Identité de la société</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="co-name">Raison sociale *</label>
+                  <input type="text" id="co-name" placeholder="Ex: Société Industrielle Atlas SARL">
+                </div>
+                <div class="form-group">
+                  <label for="co-legal-form">Forme juridique</label>
+                  <select id="co-legal-form">
+                    <option value="">—</option>
+                    <option value="SARL">SARL</option>
+                    <option value="SA">SA</option>
+                    <option value="SAS">SAS</option>
+                    <option value="SUARL">SUARL</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="co-activity">Activité</label>
+                <input type="text" id="co-activity" placeholder="Ex: Vente de matériel informatique">
+              </div>
+            </div>
+
+            <div class="co-card">
+              <h4><i class="fa-solid fa-location-dot"></i> Coordonnées</h4>
+              <div class="form-group">
+                <label for="co-address">Adresse *</label>
+                <input type="text" id="co-address" placeholder="Ex: 123 Avenue Habib Bourguiba">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="co-city">Ville</label>
+                  <input type="text" id="co-city" placeholder="Ex: Tunis">
+                </div>
+                <div class="form-group">
+                  <label for="co-country">Pays</label>
+                  <input type="text" id="co-country" placeholder="Ex: Tunisie">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="co-phone">Téléphone *</label>
+                  <input type="tel" id="co-phone" placeholder="+216 70 000 000">
+                </div>
+                <div class="form-group">
+                  <label for="co-email">Email *</label>
+                  <input type="email" id="co-email" placeholder="contact@societe.com">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="co-website">Site web</label>
+                <input type="text" id="co-website" placeholder="www.societe.com">
+              </div>
+            </div>
+
+            <div class="co-card">
+              <h4><i class="fa-solid fa-scale-balanced"></i> Informations légales et fiscales</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="co-tax-id">Matricule fiscal / N° TVA *</label>
+                  <input type="text" id="co-tax-id" placeholder="Ex: 1234567/A/M/000">
+                </div>
+                <div class="form-group">
+                  <label for="co-place">Lieu d'émission des documents *</label>
+                  <input type="text" id="co-place" placeholder="Ex: Tunis">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="co-ice">ICE</label>
+                  <input type="text" id="co-ice">
+                </div>
+                <div class="form-group">
+                  <label for="co-ic">Registre de commerce (RC)</label>
+                  <input type="text" id="co-ic">
+                </div>
+              </div>
+            </div>
+
+            <div class="co-card">
+              <h4><i class="fa-solid fa-file-invoice-dollar"></i> Valeurs par défaut des factures</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="co-tva">Taux de TVA par défaut (%)</label>
+                  <input type="number" id="co-tva" step="0.1" min="0" max="100" value="19">
+                </div>
+                <div class="form-group">
+                  <label for="co-terms">Conditions de règlement par défaut</label>
+                  <input type="text" id="co-terms" placeholder="Ex: Paiement à 30 jours">
+                </div>
+              </div>
+            </div>
+
+            <div class="co-card">
+              <h4><i class="fa-solid fa-landmark"></i> Coordonnées bancaires</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="co-bank">Banque</label>
+                  <input type="text" id="co-bank" placeholder="Ex: Banque de Tunisie">
+                </div>
+                <div class="form-group">
+                  <label for="co-swift">Code SWIFT / BIC</label>
+                  <input type="text" id="co-swift">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="co-rib">RIB</label>
+                  <input type="text" id="co-rib">
+                </div>
+                <div class="form-group">
+                  <label for="co-iban">IBAN</label>
+                  <input type="text" id="co-iban">
+                </div>
+              </div>
+              <small style="color:#64748b;">Les coordonnées bancaires figurent sur la facture si Banque, RIB et IBAN sont tous renseignés.</small>
+            </div>
+
+            <button type="submit" id="co-save" class="btn-primary">
+              <i class="fa-solid fa-floppy-disk"></i> Enregistrer les informations
+            </button>
+          </form>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/societe.js"></script>
+</body>
+</html>

@@ -21,9 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const isDemo = token.startsWith("demo_");
     let currentInvoices = [];
 
-    // ------------------------------------------------------------------
-    // Types de documents acceptés par le backend
-    // ------------------------------------------------------------------
     const DOC_LABELS = {
         INVOICE: "Facture",
         QUOTE: "Devis",
@@ -34,9 +31,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const LEGACY_DOC_TYPES = { FACTURE: "INVOICE", DEVIS: "QUOTE", COMMANDE: "PROFORMA" };
     const normDocType = (t) => LEGACY_DOC_TYPES[t] || t || "INVOICE";
 
-    // ------------------------------------------------------------------
-    // Profil de l'émetteur mémorisé (sera aussi alimenté par la page Société)
-    // ------------------------------------------------------------------
     const COMPANY_KEY = "company_profile";
     const ISSUER_FIELDS = {
         name: "issuer-name",
@@ -66,11 +60,19 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         return issuer;
     }
+        
+    async function syncCompanyProfile() {
+        if (isDemo) return;
+        try {
+            const res = await fetch(`${API}/company/`, { headers: { "Authorization": `Bearer ${token}` } });
+            if (res.ok) {
+                const c = await res.json();
+                const clean = Object.fromEntries(Object.entries(c).filter(([, v]) => v !== null && v !== ""));
+                localStorage.setItem(COMPANY_KEY, JSON.stringify(clean));
+            }
+        } catch (_) { /* on garde la copie locale */ }
+    }
 
-    // ------------------------------------------------------------------
-    // Transforme n'importe quelle erreur de l'API (texte, liste FastAPI,
-    // objet) en message lisible. Corrige l'affichage "[object Object]".
-    // ------------------------------------------------------------------
     function formatApiError(data, fallback) {
         if (!data) return fallback;
         const d = data.detail !== undefined ? data.detail
@@ -104,9 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return false;
     }
 
-    // ------------------------------------------------------------------
-    // Données de démonstration (uniquement si le token est un token démo)
-    // ------------------------------------------------------------------
+
     function getDemoInvoices() {
         const stored = localStorage.getItem("demo_invoices");
         if (stored) return JSON.parse(stored);
@@ -119,9 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return defaults;
     }
 
-    // ------------------------------------------------------------------
-    // Récupération des factures
-    // ------------------------------------------------------------------
+    
     async function fetchInvoices() {
         if (isDemo) {
             const list = getDemoInvoices();
@@ -164,9 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (kpiCountAttente) kpiCountAttente.textContent = attente;
     }
 
-    // ------------------------------------------------------------------
-    // Affichage du tableau
-    // ------------------------------------------------------------------
+    
     function renderTable(invoices) {
         currentInvoices = invoices || [];
         if (!invoices || invoices.length === 0) {
@@ -219,9 +215,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ------------------------------------------------------------------
-    // Téléchargement du PDF
-    // ------------------------------------------------------------------
     async function handleDownloadPDF(invoiceId, invoiceNumber) {
         if (isDemo) {
             alert(`[MODE DÉMO] Simulation du téléchargement de la facture PDF "${invoiceNumber}".`);
@@ -275,9 +268,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // ------------------------------------------------------------------
-    // Modale de création
-    // ------------------------------------------------------------------
     if (openModalBtn) {
         openModalBtn.addEventListener("click", () => {
             invoiceForm.reset();
@@ -402,9 +392,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // ------------------------------------------------------------------
-    // Paiement
-    // ------------------------------------------------------------------
     function canPay(inv) {
         return normDocType(inv.doc_type) === "INVOICE" && inv.status === "pending";
     }
