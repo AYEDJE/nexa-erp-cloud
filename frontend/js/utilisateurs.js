@@ -24,29 +24,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // ------------------------------------------------------------------
     // Utilitaires
     // ------------------------------------------------------------------
-    function decodeJWT(t) {
-        try {
-            let b64 = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-            while (b64.length % 4) b64 += "=";
-            const json = decodeURIComponent(
-                atob(b64).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
-            );
-            return JSON.parse(json);
-        } catch (_) { return null; }
-    }
-
-    // Entreprise (tenant) du compte connecté : c'est elle qu'il faut utiliser pour créer un utilisateur
-    function getTenantId() {
-        const p = decodeJWT(token) || {};
-        const fromToken = p.tenant_id || p.tenant || p.tid || p.tenantId || p.org || p.company;
-        if (fromToken) return String(fromToken);
-        try {
-            const cu = JSON.parse(localStorage.getItem("current_user") || "{}");
-            if (cu.tenant_id) return String(cu.tenant_id);
-        } catch (_) {}
-        return localStorage.getItem("tenant_id") || null;
-    }
-
     function formatApiError(data, fallback) {
         if (!data) return fallback;
         const d = data.detail !== undefined ? data.detail
@@ -89,20 +66,27 @@ document.addEventListener("DOMContentLoaded", () => {
         supplier_ext: "Fournisseur Agréé"
     };
 
+    // ------------------------------------------------------------------
+    // Données démo (uniquement si token démo)
+    // ------------------------------------------------------------------
     function getDemoUsers() {
         const stored = localStorage.getItem("demo_tenant_users");
         if (stored) return JSON.parse(stored);
         const defaults = [
-            { id: 1, email: "admin@entreprise.com", role_name: "Administrateur Entreprise", user_type: "admin", is_active: true, is_two_factor_enabled: true },
-            { id: 2, email: "commercial@entreprise.com", role_name: "Responsable Commercial", user_type: "staff", is_active: true, is_two_factor_enabled: false },
-            { id: 3, email: "comptabilite@entreprise.com", role_name: "Responsable Financier & Comptable", user_type: "staff", is_active: true, is_two_factor_enabled: true },
-            { id: 4, email: "stock@entreprise.com", role_name: "Responsable des Stocks & Magasinier", user_type: "staff", is_active: true, is_two_factor_enabled: false },
-            { id: 5, email: "contact@client-partenaire.com", role_name: "Client Partenaire (Portail Externe)", user_type: "external", is_active: true, is_two_factor_enabled: false }
+            { id: 1, full_name: "Administrateur", email: "admin@entreprise.com", role_name: "Administrateur Entreprise", user_type: "admin", is_active: true, is_two_factor_enabled: true },
+            { id: 2, full_name: "Responsable Commercial", email: "commercial@entreprise.com", role_name: "Responsable Commercial", user_type: "staff", is_active: true, is_two_factor_enabled: false },
+            { id: 3, full_name: "Comptable", email: "comptabilite@entreprise.com", role_name: "Responsable Financier & Comptable", user_type: "staff", is_active: true, is_two_factor_enabled: true },
+            { id: 4, full_name: "Magasinier", email: "stock@entreprise.com", role_name: "Responsable des Stocks & Magasinier", user_type: "staff", is_active: true, is_two_factor_enabled: false },
+            { id: 5, full_name: "Client Partenaire", email: "contact@client-partenaire.com", role_name: "Client Partenaire (Portail Externe)", user_type: "external", is_active: true, is_two_factor_enabled: false }
         ];
         localStorage.setItem("demo_tenant_users", JSON.stringify(defaults));
         return defaults;
     }
 
+    // ------------------------------------------------------------------
+    // Récupération des utilisateurs
+    //   Retourne : un tableau (succès) ou null (erreur de chargement)
+    // ------------------------------------------------------------------
     let currentUsers = [];
 
     async function fetchUsers() {
@@ -121,7 +105,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (res.status === 401) {
                 localStorage.removeItem("access_token");
                 window.location.href = "index.html";
-                return [];
+                return null;
+            }
+
+            if (res.status === 403) {
+                throw new Error("Accès réservé aux administrateurs. Votre compte n'a pas les droits pour gérer les utilisateurs.");
             }
 
             if (!res.ok) {
@@ -139,7 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
             currentUsers = [];
             tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#dc2626;">${escapeHtml(error.message)}</td></tr>`;
             updateKPIs([]);
-            return [];
+            return null;          // null = erreur de chargement (différent d'une liste vide)
         }
     }
 
@@ -156,6 +144,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (kpiMfa) kpiMfa.textContent = mfa;
     }
 
+    // ------------------------------------------------------------------
+    // Affichage
+    // ------------------------------------------------------------------
     function getRoleBadge(user) {
         const saved = getSavedRoles()[(user.email || "").toLowerCase()];
         const role = (user.role_name || user.role || saved || user.user_type || "").toLowerCase();
@@ -188,6 +179,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const perimeter = u.user_type === "external" ? "Portail Externe" : "Interne Entreprise";
             const savedKey = getSavedRoles()[(u.email || "").toLowerCase()];
             const roleText = u.role_name || u.role || (savedKey ? ROLE_LABELS[savedKey] : "") || u.user_type || "";
+            const shownName = u.full_name || (u.email ? u.email.split("@")[0] : "—");
+            const initials = shownName.split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase();
             const mfaIcon = u.is_two_factor_enabled
                 ? `<span style="color:#16a34a; font-weight:600; font-size:12px;"><i class="fa-solid fa-lock"></i> Activé</span>`
                 : `<span style="color:#94a3b8; font-size:12px;"><i class="fa-solid fa-unlock"></i> Non configuré</span>`;
@@ -196,8 +189,13 @@ document.addEventListener("DOMContentLoaded", () => {
             <tr>
                 <td><strong>#${escapeHtml(u.id)}</strong></td>
                 <td>
-                    <div style="font-weight:600; color:#111827;">${escapeHtml(u.email)}</div>
-                    <small style="color:#64748b;">${escapeHtml(roleText)}</small>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="width:34px; height:34px; border-radius:50%; background:#dbeafe; color:#1e40af; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">${escapeHtml(initials)}</span>
+                        <div>
+                            <div style="font-weight:600; color:#111827;">${escapeHtml(shownName)}</div>
+                            <small style="color:#64748b;">${escapeHtml(u.email)} · ${escapeHtml(roleText)}</small>
+                        </div>
+                    </div>
                 </td>
                 <td>${getRoleBadge(u)}</td>
                 <td><small style="font-weight:500; color:#475569;">${perimeter}</small></td>
@@ -217,10 +215,14 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // ------------------------------------------------------------------
+    // Inscription d'un nouveau collaborateur
+    // ------------------------------------------------------------------
     userForm.addEventListener("submit", async (e) => {
         e.preventDefault();
 
         const submitBtn = userForm.querySelector("button[type='submit']");
+        const fullName = (document.getElementById("new-fullname")?.value || "").trim();
         const email = document.getElementById("new-email").value.trim();
         const roleVal = document.getElementById("new-role").value;
         const password = document.getElementById("new-password").value;
@@ -245,6 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const newId = list.length > 0 ? Math.max(...list.map(u => u.id)) + 1 : 1;
             list.push({
                 id: newId,
+                full_name: fullName,
                 email: email,
                 role_name: ROLE_LABELS[roleVal],
                 user_type: userType,
@@ -260,25 +263,19 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // ----- Mode API réel -----
-        const tenantId = getTenantId();
-        if (!tenantId) {
-            alert("Impossible de déterminer votre entreprise (tenant_id) depuis votre session. Reconnectez-vous puis réessayez.");
-            return;
-        }
-
+        // ----- Mode API réel : route protégée, le tenant vient du token -----
         const payload = {
+            full_name: fullName,
             email: email,
             password: password,
-            tenant_id: tenantId,         
             user_type: userType,
             role: roleVal
         };
-        console.info("Création utilisateur — tenant utilisé :", tenantId, "| payload :", { ...payload, password: "***" });
+        console.info("Création utilisateur — payload :", { ...payload, password: "***" });
 
         if (submitBtn) submitBtn.disabled = true;
         try {
-            const res = await fetch(`${API}/auth/register`, {
+            const res = await fetch(`${API}/users/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -287,9 +284,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify(payload)
             });
 
+            if (res.status === 403) {
+                throw new Error("Accès réservé aux administrateurs.");
+            }
             if (!res.ok) {
                 const errData = await res.json().catch(() => null);
-                console.error("Réponse API (inscription) :", res.status, errData);
+                console.error("Réponse API (création utilisateur) :", res.status, errData);
                 throw new Error(formatApiError(errData, `Erreur ${res.status} lors de l'inscription.`));
             }
 
@@ -298,16 +298,14 @@ document.addEventListener("DOMContentLoaded", () => {
             userForm.reset();
 
             const users = await fetchUsers();
-            const visible = users.some(u => (u.email || "").toLowerCase() === email.toLowerCase());
+            const visible = Array.isArray(users) && users.some(u => (u.email || "").toLowerCase() === email.toLowerCase());
 
             if (visible) {
                 alert(tr("user_created", { email }));
+            } else if (users === null) {
+                alert(`Le compte "${email}" a été créé, mais la liste n'a pas pu être rechargée.\nLa raison est affichée dans le tableau de la page.`);
             } else {
-                console.warn("Utilisateur créé mais absent de GET /users/ — tenant utilisé :", tenantId, "| liste reçue :", users);
-                alert(
-                    `Le compte "${email}" a été créé (entreprise : ${tenantId}), mais il n'apparaît pas dans la liste renvoyée par le serveur.\n\n` +
-                    `Ouvrez la console (F12) : le détail y est affiché. Cela vient du backend (filtre de l'entreprise sur /users/).`
-                );
+                alert(`Le compte "${email}" a été créé mais n'apparaît pas dans la liste. Voir la console (F12).`);
             }
         } catch (error) {
             console.error(error);
@@ -317,7 +315,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    function handleToggleStatus(userId) {
+    // ------------------------------------------------------------------
+    // Activer / désactiver un compte
+    // ------------------------------------------------------------------
+    async function handleToggleStatus(userId) {
         if (isDemo) {
             let list = getDemoUsers();
             list = list.map(u => String(u.id) === String(userId) ? { ...u, is_active: !u.is_active } : u);
@@ -325,9 +326,29 @@ document.addEventListener("DOMContentLoaded", () => {
             fetchUsers();
             return;
         }
-        alert("Action transmise au backend pour le compte #" + userId);
+
+        const u = currentUsers.find(x => String(x.id) === String(userId));
+        if (!u) return;
+
+        try {
+            const res = await fetch(`${API}/users/${userId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ is_active: u.is_active === false })
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => null);
+                throw new Error(formatApiError(errData, `Erreur ${res.status}`));
+            }
+            fetchUsers();
+        } catch (err) {
+            alert(tr("error_prefix", { msg: err.message }));
+        }
     }
 
+    // ------------------------------------------------------------------
+    // Modale
+    // ------------------------------------------------------------------
     if (openModalBtn) {
         openModalBtn.addEventListener("click", () => {
             userForm.reset();
