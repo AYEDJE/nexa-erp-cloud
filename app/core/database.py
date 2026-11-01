@@ -22,6 +22,7 @@ def ensure_schema_up_to_date(target_engine):
             if res:
                 existing_cols = [r[1] for r in res]
                 new_cols = [
+                    ("full_name", "TEXT"),
                     ("two_factor_secret", "TEXT"),
                     ("is_two_factor_enabled", "BOOLEAN DEFAULT 0"),
                     ("backup_codes", "TEXT"),

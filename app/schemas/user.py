@@ -14,6 +14,7 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     user_type: Optional[str] = None
     is_active: Optional[bool] = None
@@ -22,6 +23,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: int
     tenant_id: str
+    full_name: Optional[str] = None
     is_active: bool
     is_two_factor_enabled: bool = False
     last_login_at: Optional[datetime] = None

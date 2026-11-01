@@ -19,9 +19,7 @@ def list_tenant_users(
     tenant_id: str = Depends(get_current_tenant_id),
     db: Session = Depends(get_db)
 ):
-    """
-    Récupère la liste de tous les utilisateurs de l'entreprise (tenant) connectée.
-    """
+    
     users = db.query(UserORM).filter(UserORM.tenant_id == tenant_id).all()
     return users
 
@@ -32,9 +30,7 @@ def get_user_by_id(
     tenant_id: str = Depends(get_current_tenant_id),
     db: Session = Depends(get_db)
 ):
-    """
-    Récupère les détails d'un utilisateur spécifique du tenant.
-    """
+    
     user = db.query(UserORM).filter(
         UserORM.id == user_id,
         UserORM.tenant_id == tenant_id
@@ -55,9 +51,6 @@ def update_user_role(
     tenant_id: str = Depends(get_current_tenant_id),
     db: Session = Depends(get_db)
 ):
-    """
-    Met à jour le rôle ou le statut d'un utilisateur au sein du même tenant.
-    """
     user = db.query(UserORM).filter(
         UserORM.id == user_id,
         UserORM.tenant_id == tenant_id

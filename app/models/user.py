@@ -47,6 +47,7 @@ class UserCreate(BaseModel):
     tenant_id: str
     email: EmailStr
     password: str
+    full_name: Optional[str] = None
     user_type: UserType = UserType.STAFF
 
 
@@ -54,6 +55,7 @@ class UserResponse(BaseModel):
     id: int
     tenant_id: str
     email: EmailStr
+    full_name: Optional[str] = None
     user_type: UserType
     is_active: bool
     is_two_factor_enabled: bool = False
