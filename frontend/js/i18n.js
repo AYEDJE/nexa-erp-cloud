@@ -243,7 +243,7 @@
     ["Téléphone", "Phone", "الهاتف"],
     ["Adresse", "Address", "العنوان"],
     ["Prix", "Price", "السعر"],
-    ["Stock", "Stock", "المخزون"]
+    ["Stock", "Stock", "المخزون"],
 
     ["Ma Société", "My Company", "شركتي"],
     ["Ces informations apparaissent sur tous vos documents (factures, devis, bons de livraison…).", "This information appears on all your documents (invoices, quotes, delivery notes…).", "تظهر هذه المعلومات على جميع وثائقك (فواتير، عروض أسعار، سندات تسليم…)."],
