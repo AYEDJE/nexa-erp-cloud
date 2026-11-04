@@ -20,6 +20,10 @@ from app.core.config import (
 
 
 # --- 1. HACHAGE & VÉRIFICATION DES MOTS DE PASSE ---
+def normalize_email(email: str) -> str:
+    """E-mail comparé sans tenir compte de la casse ni des espaces."""
+    return (email or "").strip().lower()
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
