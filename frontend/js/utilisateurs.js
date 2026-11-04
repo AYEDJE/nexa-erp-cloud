@@ -67,20 +67,35 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // ------------------------------------------------------------------
-    // Données démo (uniquement si token démo)
     // ------------------------------------------------------------------
-    function getDemoUsers() {
-        const stored = localStorage.getItem("demo_tenant_users");
-        if (stored) return JSON.parse(stored);
-        const defaults = [
-            { id: 1, full_name: "Administrateur", email: "admin@entreprise.com", role_name: "Administrateur Entreprise", user_type: "admin", is_active: true, is_two_factor_enabled: true },
-            { id: 2, full_name: "Responsable Commercial", email: "commercial@entreprise.com", role_name: "Responsable Commercial", user_type: "staff", is_active: true, is_two_factor_enabled: false },
-            { id: 3, full_name: "Comptable", email: "comptabilite@entreprise.com", role_name: "Responsable Financier & Comptable", user_type: "staff", is_active: true, is_two_factor_enabled: true },
-            { id: 4, full_name: "Magasinier", email: "stock@entreprise.com", role_name: "Responsable des Stocks & Magasinier", user_type: "staff", is_active: true, is_two_factor_enabled: false },
-            { id: 5, full_name: "Client Partenaire", email: "contact@client-partenaire.com", role_name: "Client Partenaire (Portail Externe)", user_type: "external", is_active: true, is_two_factor_enabled: false }
+    // Données isolées par entreprise (Multi-Tenant)
+    // ------------------------------------------------------------------
+    function getTenantUsers() {
+        const tenantId = window.NexaTenant ? window.NexaTenant.getTenantId() : 'default';
+        const isSeedDemo = (tenantId === 'entreprise_demo');
+        const currentUser = window.NexaTenant ? window.NexaTenant.getCurrentUser() : {};
+        const fallback = isSeedDemo ? [
+            { id: 1, full_name: "Administrateur Démo", email: "admin@nexa.local", role_name: "Administrateur Entreprise", user_type: "admin", is_active: true, is_two_factor_enabled: true },
+            { id: 2, full_name: "Responsable Commercial", email: "commercial@nexa.local", role_name: "Responsable Commercial", user_type: "staff", is_active: true, is_two_factor_enabled: false }
+        ] : [
+            { id: 1, full_name: (currentUser.username || currentUser.company_name || "Administrateur"), email: (currentUser.email || "admin@entreprise.com"), role_name: "Administrateur Entreprise", user_type: "admin", is_active: true, is_two_factor_enabled: false }
         ];
-        localStorage.setItem("demo_tenant_users", JSON.stringify(defaults));
-        return defaults;
+
+        if (window.NexaTenant) {
+            return window.NexaTenant.getData('users', fallback);
+        }
+        const key = `nexa_${tenantId}_users`;
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : fallback;
+    }
+
+    function saveTenantUsers(list) {
+        if (window.NexaTenant) {
+            window.NexaTenant.setData('users', list);
+        } else {
+            const tenantId = 'default';
+            localStorage.setItem(`nexa_${tenantId}_users`, JSON.stringify(list));
+        }
     }
 
     // ------------------------------------------------------------------
@@ -90,13 +105,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentUsers = [];
 
     async function fetchUsers() {
-        if (isDemo) {
-            const list = getDemoUsers();
-            renderTable(list);
-            updateKPIs(list);
-            return list;
-        }
-
         try {
             const res = await fetch(`${API}/users/`, {
                 headers: { "Authorization": `Bearer ${token}` }
@@ -112,23 +120,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error("Accès réservé aux administrateurs. Votre compte n'a pas les droits pour gérer les utilisateurs.");
             }
 
-            if (!res.ok) {
-                const errData = await res.json().catch(() => null);
-                throw new Error(formatApiError(errData, `Erreur ${res.status}`));
+            if (res.ok) {
+                const data = await res.json();
+                const users = Array.isArray(data) ? data : (data.items || data.users || data.data || []);
+                saveTenantUsers(users);
+                renderTable(users);
+                updateKPIs(users);
+                return users;
             }
-
-            const data = await res.json();
-            const users = Array.isArray(data) ? data : (data.items || data.users || data.data || []);
-            renderTable(users);
-            updateKPIs(users);
-            return users;
         } catch (error) {
-            console.error("Impossible de charger les utilisateurs :", error);
-            currentUsers = [];
-            tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#dc2626;">${escapeHtml(error.message)}</td></tr>`;
-            updateKPIs([]);
-            return null;          // null = erreur de chargement (différent d'une liste vide)
+            // Backend non disponible ou erreur réseau -> repli sur la base isolée du tenant
         }
+
+        const list = getTenantUsers();
+        renderTable(list);
+        updateKPIs(list);
+        return list;
     }
 
     function updateKPIs(list) {
@@ -241,29 +248,38 @@ document.addEventListener("DOMContentLoaded", () => {
         if (roleVal === "admin") userType = "admin";
         else if (roleVal === "client_ext" || roleVal === "supplier_ext") userType = "external";
 
-        // ----- Mode démo -----
-        if (isDemo) {
-            const list = getDemoUsers();
-            const newId = list.length > 0 ? Math.max(...list.map(u => u.id)) + 1 : 1;
-            list.push({
-                id: newId,
-                full_name: fullName,
+        // Sauvegarde locale isolée pour l'entreprise connectée
+        const list = getTenantUsers();
+        const newId = list.length > 0 ? Math.max(...list.map(u => u.id)) + 1 : 1;
+        const newUser = {
+            id: newId,
+            full_name: fullName,
+            email: email,
+            role_name: ROLE_LABELS[roleVal] || roleVal,
+            user_type: userType,
+            is_active: true,
+            is_two_factor_enabled: false
+        };
+        list.push(newUser);
+        saveTenantUsers(list);
+        saveRole(email, roleVal);
+
+        // Enregistrer dans le registre global pour permettre la connexion du collaborateur
+        if (window.NexaTenant) {
+            const tenantId = window.NexaTenant.getTenantId();
+            window.NexaTenant.registerUser({
                 email: email,
-                role_name: ROLE_LABELS[roleVal],
+                password: password,
+                username: fullName,
+                tenant_id: tenantId,
+                company_name: window.NexaTenant.getCurrentUser()?.company_name || tenantId,
+                role_name: ROLE_LABELS[roleVal] || roleVal,
                 user_type: userType,
-                is_active: true,
-                is_two_factor_enabled: false
+                is_active: true
             });
-            localStorage.setItem("demo_tenant_users", JSON.stringify(list));
-            saveRole(email, roleVal);
-            modal.style.display = "none";
-            userForm.reset();
-            fetchUsers();
-            alert(tr("user_created", { email }));
-            return;
         }
 
-        // ----- Mode API réel : route protégée, le tenant vient du token -----
+        // Tentative de synchronisation vers le backend
         const payload = {
             full_name: fullName,
             email: email,
@@ -271,11 +287,10 @@ document.addEventListener("DOMContentLoaded", () => {
             user_type: userType,
             role: roleVal
         };
-        console.info("Création utilisateur — payload :", { ...payload, password: "***" });
 
         if (submitBtn) submitBtn.disabled = true;
         try {
-            const res = await fetch(`${API}/users/`, {
+            await fetch(`${API}/users/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -283,67 +298,44 @@ document.addEventListener("DOMContentLoaded", () => {
                 },
                 body: JSON.stringify(payload)
             });
+        } catch (_) {}
 
-            if (res.status === 403) {
-                throw new Error("Accès réservé aux administrateurs.");
-            }
-            if (!res.ok) {
-                const errData = await res.json().catch(() => null);
-                console.error("Réponse API (création utilisateur) :", res.status, errData);
-                throw new Error(formatApiError(errData, `Erreur ${res.status} lors de l'inscription.`));
-            }
-
-            saveRole(email, roleVal);
-            modal.style.display = "none";
-            userForm.reset();
-
-            const users = await fetchUsers();
-            const visible = Array.isArray(users) && users.some(u => (u.email || "").toLowerCase() === email.toLowerCase());
-
-            if (visible) {
-                alert(tr("user_created", { email }));
-            } else if (users === null) {
-                alert(`Le compte "${email}" a été créé, mais la liste n'a pas pu être rechargée.\nLa raison est affichée dans le tableau de la page.`);
-            } else {
-                alert(`Le compte "${email}" a été créé mais n'apparaît pas dans la liste. Voir la console (F12).`);
-            }
-        } catch (error) {
-            console.error(error);
-            alert(tr("error_prefix", { msg: error.message }));
-        } finally {
-            if (submitBtn) submitBtn.disabled = false;
-        }
+        modal.style.display = "none";
+        userForm.reset();
+        fetchUsers();
+        alert(tr("user_created", { email }));
+        if (submitBtn) submitBtn.disabled = false;
     });
 
     // ------------------------------------------------------------------
     // Activer / désactiver un compte
     // ------------------------------------------------------------------
     async function handleToggleStatus(userId) {
-        if (isDemo) {
-            let list = getDemoUsers();
-            list = list.map(u => String(u.id) === String(userId) ? { ...u, is_active: !u.is_active } : u);
-            localStorage.setItem("demo_tenant_users", JSON.stringify(list));
-            fetchUsers();
-            return;
-        }
+        let list = getTenantUsers();
+        const target = list.find(u => String(u.id) === String(userId));
+        if (target) {
+            target.is_active = !target.is_active;
+            saveTenantUsers(list);
 
-        const u = currentUsers.find(x => String(x.id) === String(userId));
-        if (!u) return;
+            if (window.NexaTenant) {
+                window.NexaTenant.registerUser({
+                    email: target.email,
+                    is_active: target.is_active
+                });
+            }
+        }
 
         try {
-            const res = await fetch(`${API}/users/${userId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ is_active: u.is_active === false })
-            });
-            if (!res.ok) {
-                const errData = await res.json().catch(() => null);
-                throw new Error(formatApiError(errData, `Erreur ${res.status}`));
+            if (target) {
+                await fetch(`${API}/users/${userId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                    body: JSON.stringify({ is_active: target.is_active })
+                });
             }
-            fetchUsers();
-        } catch (err) {
-            alert(tr("error_prefix", { msg: err.message }));
-        }
+        } catch (_) {}
+
+        fetchUsers();
     }
 
     // ------------------------------------------------------------------

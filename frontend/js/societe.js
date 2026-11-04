@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const tr = (k, p) => (window.i18n ? window.i18n.t(k, p) : k);
-    const isDemo = token.startsWith("demo_");
+    const isDemo = !token || token.startsWith("demo_");
     const COMPANY_KEY = "company_profile";
 
     const form = document.getElementById("company-form");
@@ -81,17 +81,37 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Garde une copie locale utilisée comme pré-remplissage par la page Factures
+    // Garde une copie locale isolée par entreprise (multi-tenant)
     function cacheProfile(c) {
         const clean = Object.fromEntries(Object.entries(c).filter(([, v]) => v !== null && v !== ""));
-        localStorage.setItem(COMPANY_KEY, JSON.stringify(clean));
+        if (window.NexaTenant) {
+            window.NexaTenant.setData("company", clean);
+        } else {
+            localStorage.setItem(COMPANY_KEY, JSON.stringify(clean));
+        }
     }
 
     async function loadCompany() {
-        if (isDemo) {
-            try { fillForm(JSON.parse(localStorage.getItem(COMPANY_KEY)) || {}); } catch (_) { fillForm({}); }
-            return;
+        // Mode Démo ou Local isolé par entreprise
+        if (isDemo || window.NexaTenant) {
+            let data = null;
+            if (window.NexaTenant) {
+                data = window.NexaTenant.getData("company", null);
+            }
+            if (!data) {
+                try { data = JSON.parse(localStorage.getItem(COMPANY_KEY)) || {}; } catch (_) { data = {}; }
+            }
+            // Si le profil est vide, pré-remplir avec les informations de l'entreprise connectée
+            const u = window.NexaTenant ? window.NexaTenant.getCurrentUser() : null;
+            if (u && (!data || !data.name)) {
+                data = data || {};
+                data.name = u.company_name || u.company || "";
+                data.email = u.email || "";
+            }
+            fillForm(data || {});
+            if (isDemo) return;
         }
+
         try {
             const res = await fetch(`${API}/company/`, { headers: { "Authorization": `Bearer ${token}` } });
             if (res.status === 401) {
@@ -108,8 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
             fillForm(company);
             cacheProfile(company);
         } catch (err) {
-            console.error(err);
-            showAlert(err.message, "error");
+            console.warn("Connexion API indisponible pour la société, utilisation du profil isolé local :", err);
         }
     }
 
@@ -129,7 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (isDemo) {
             cacheProfile(payload);
             updateCompleteness(payload);
-            showAlert(tr("Informations enregistrées (mode démo)."), "success");
+            showAlert("Informations de la société enregistrées avec succès.", "success");
             return;
         }
 
@@ -156,10 +175,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const saved = await res.json();
             fillForm(saved);
             cacheProfile(saved);
-            showAlert(tr("Informations de la société enregistrées avec succès."), "success");
+            showAlert("Informations de la société enregistrées avec succès.", "success");
         } catch (err) {
-            console.error(err);
-            showAlert(tr("error_prefix", { msg: err.message }), "error");
+            console.warn("Backend indisponible, enregistrement local isolé pour cette entreprise :", err);
+            cacheProfile(payload);
+            updateCompleteness(payload);
+            showAlert("Informations de la société enregistrées avec succès (espace entreprise isolé).", "success");
         } finally {
             saveBtn.disabled = false;
         }

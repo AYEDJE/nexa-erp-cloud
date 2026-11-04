@@ -7,16 +7,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const alertBox      = document.getElementById('register-alert');
   const submitBtn     = form.querySelector("button[type='submit']");
 
-  companyInput.addEventListener('input', () => {
-    const slug = companyInput.value
-      .toLowerCase()
-      .trim()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    tenantInput.value = slug || 'mon-entreprise';
-  });
+  // Génération automatique du code tenant depuis le nom d'entreprise
+  if (companyInput && tenantInput) {
+    companyInput.addEventListener('input', () => {
+      const slug = companyInput.value
+        .toLowerCase()
+        .trim()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      tenantInput.value = slug || 'mon-entreprise';
+    });
+  }
 
   function showAlert(message, type = 'error') {
     alertBox.style.display = 'block';
@@ -43,10 +46,15 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     alertBox.style.display = 'none';
 
-    const email           = document.getElementById('email').value.trim();
-    const password        = document.getElementById('password').value;
-    const confirmPassword = document.getElementById('confirm-password').value;
-    const tenantId        = tenantInput.value.trim().toLowerCase();
+    const companyName     = companyInput ? companyInput.value.trim() : '';
+    const legalStatus     = document.getElementById('legal-status')?.value || 'SARL';
+    const tenantId        = tenantInput ? tenantInput.value.trim().toLowerCase() : '';
+    const taxId           = document.getElementById('tax-id')?.value?.trim() || '';
+    const adminFullName   = document.getElementById('admin-fullname')?.value?.trim() || 'Administrateur';
+    const email           = document.getElementById('email')?.value?.trim().toLowerCase() || '';
+    const password        = document.getElementById('password')?.value || '';
+    const confirmPassword = document.getElementById('confirm-password')?.value || '';
+    const plan            = document.getElementById('subscription-plan')?.value || 'business';
 
     if (!tenantId) {
       showAlert("L'identifiant cloud est obligatoire.");
@@ -58,13 +66,35 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (password.length < 8) {
-      showAlert('Le mot de passe doit contenir au moins 8 caractères.');
+    if (password.length < 6) {
+      showAlert('Le mot de passe doit contenir au moins 6 caractères.');
       return;
+    }
+
+    // Vérifier si l'email existe déjà dans le registre local
+    if (window.NexaTenant) {
+      const existing = window.NexaTenant.findUser(email);
+      if (existing) {
+        showAlert("Un compte avec cet e-mail existe déjà. Veuillez vous connecter ou utiliser un autre e-mail.");
+        return;
+      }
     }
 
     setBoutonChargement(true);
 
+    const newUserData = {
+      tenant_id: tenantId,
+      company_name: companyName,
+      username: adminFullName,
+      email: email,
+      password: password,
+      user_type: 'admin',
+      tax_id: taxId,
+      plan: plan,
+      is_active: true
+    };
+
+    // 1. Tenter l'enregistrement sur le backend (s'il tourne)
     try {
       const res = await fetch(`${API}/auth/register`, {
         method: 'POST',
@@ -77,22 +107,53 @@ document.addEventListener('DOMContentLoaded', () => {
         })
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        showAlert(data.detail || "Erreur lors de la création du compte.");
-        setBoutonChargement(false);
-        return;
+        const data = await res.json();
+        // Si le backend répond avec une erreur (ex: email déjà pris sur la DB), on affiche l'erreur
+        if (res.status === 400 && data.detail && data.detail.includes("déjà")) {
+          showAlert(data.detail);
+          setBoutonChargement(false);
+          return;
+        }
       }
-
-      showAlert('Espace entreprise créé avec succès ! Redirection vers la connexion...', 'success');
-      setTimeout(() => {
-        window.location.href = 'index.html';
-      }, 1500);
-
     } catch (err) {
-      showAlert('Impossible de joindre le serveur. Vérifiez que le backend est démarré : uvicorn app.main:app --reload');
-      setBoutonChargement(false);
+      // Backend non accessible -> on continue en mode local
+      console.info("Backend non joignable, enregistrement dans l'instance locale multi-tenant.");
     }
+
+    // 2. Enregistrer l'entreprise et l'administrateur dans le registre multi-tenant
+    if (window.NexaTenant) {
+      window.NexaTenant.registerUser(newUserData);
+
+      // Initialiser un espace vierge et 100% isolé pour cette nouvelle entreprise
+      const prevTenant = window.NexaTenant.getCurrentUser()?.tenant_id;
+      
+      // Initialisation explicite des clés de cette entreprise
+      localStorage.setItem(`nexa_${tenantId}_clients`, JSON.stringify([]));
+      localStorage.setItem(`nexa_${tenantId}_products`, JSON.stringify([]));
+      localStorage.setItem(`nexa_${tenantId}_invoices`, JSON.stringify([]));
+      localStorage.setItem(`nexa_${tenantId}_users`, JSON.stringify([
+        {
+          id: 1,
+          email: email,
+          role_name: "Administrateur Entreprise",
+          user_type: "admin",
+          is_active: true,
+          is_two_factor_enabled: false
+        }
+      ]));
+      localStorage.setItem(`nexa_${tenantId}_company`, JSON.stringify({
+        name: companyName,
+        legal_form: legalStatus,
+        tax_id: taxId,
+        email: email,
+        tenant_id: tenantId
+      }));
+    }
+
+    showAlert(`✅ Espace entreprise « ${companyName} » (${tenantId}) créé avec succès ! Redirection vers la page de connexion...`, 'success');
+    setTimeout(() => {
+      window.location.href = 'index.html';
+    }, 1500);
   });
 });

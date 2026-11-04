@@ -16,10 +16,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const kpiB2c = document.getElementById("kpi-b2c-count");
     const kpiPortal = document.getElementById("kpi-portal-count");
 
-    function getDemoClients() {
-        const stored = localStorage.getItem("demo_clients");
-        if (stored) return JSON.parse(stored);
-        const defaults = [
+    // Données par défaut uniquement pour l'entreprise de démonstration
+    function getDefaultClientsForDemo() {
+        return [
             {
                 id: 1,
                 code: "CLI-001",
@@ -43,38 +42,35 @@ document.addEventListener("DOMContentLoaded", () => {
                 city: "Paris",
                 address: "Boulevard Haussmann",
                 portal_active: true
-            },
-            {
-                id: 3,
-                code: "CLI-003",
-                name: "Groupe Industriel Moderne",
-                type: "B2B",
-                tax_id: "4598712/C/M/000",
-                email: "achats@gim-group.com",
-                phone: "+216 74 200 400",
-                city: "Sfax",
-                address: "Route de Gabès Km 3",
-                portal_active: false
-            },
-            {
-                id: 4,
-                code: "CLI-004",
-                name: "Ahmed Trabelsi",
-                type: "B2C",
-                tax_id: "-",
-                email: "a.trabelsi@gmail.com",
-                phone: "+216 98 123 456",
-                city: "Sousse",
-                address: "Cité Sahloul",
-                portal_active: true
             }
         ];
-        localStorage.setItem("demo_clients", JSON.stringify(defaults));
-        return defaults;
+    }
+
+    // Récupérer les clients strictement isolés pour l'entreprise connectée
+    function getTenantClients() {
+        const tenantId = window.NexaTenant ? window.NexaTenant.getTenantId() : 'default';
+        const isSeedDemo = (tenantId === 'entreprise_demo');
+        const fallback = isSeedDemo ? getDefaultClientsForDemo() : [];
+
+        if (window.NexaTenant) {
+            return window.NexaTenant.getData('clients', fallback);
+        }
+        const key = `nexa_${tenantId}_clients`;
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : fallback;
+    }
+
+    function saveTenantClients(list) {
+        if (window.NexaTenant) {
+            window.NexaTenant.setData('clients', list);
+        } else {
+            const tenantId = 'default';
+            localStorage.setItem(`nexa_${tenantId}_clients`, JSON.stringify(list));
+        }
     }
 
     function fetchClients() {
-        const clients = getDemoClients();
+        const clients = getTenantClients();
         renderTable(clients);
         updateKPIs(clients);
     }
@@ -93,8 +89,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderTable(clients) {
+        const currentUser = window.NexaTenant ? window.NexaTenant.getCurrentUser() : {};
+        const companyName = currentUser.company_name || currentUser.tenant_id || "votre entreprise";
+
         if (!clients || clients.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: #6b7280;">Aucun client enregistré. Cliquez sur "Nouveau Client" pour en créer un.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 28px; color: #64748b;">
+                <i class="fa-solid fa-users" style="font-size:24px; color:#cbd5e1; margin-bottom:8px; display:block;"></i>
+                Aucun client enregistré pour <strong>${escapeHtml(companyName)}</strong>.<br>
+                <span style="font-size:12px;">Cliquez sur <strong>+ Nouveau Client</strong> ci-dessus pour ajouter votre premier partenaire.</span>
+            </td></tr>`;
             return;
         }
 
@@ -106,19 +109,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
             return `
             <tr>
-                <td><strong>${c.code}</strong></td>
+                <td><strong>${escapeHtml(c.code)}</strong></td>
                 <td>
-                    <div style="font-weight:600; color:#111827;">${c.name}</div>
-                    <small style="color:#64748b;">${c.tax_id && c.tax_id !== '-' ? 'MF: ' + c.tax_id : 'Client Particulier'}</small>
+                    <div style="font-weight:600; color:#111827;">${escapeHtml(c.name)}</div>
+                    <small style="color:#64748b;">${c.tax_id && c.tax_id !== '-' ? 'MF: ' + escapeHtml(c.tax_id) : 'Client Particulier'}</small>
                 </td>
-                <td><span class="client-badge ${badgeType}">${c.type}</span></td>
+                <td><span class="client-badge ${badgeType}">${escapeHtml(c.type)}</span></td>
                 <td>
-                    <div><a href="mailto:${c.email}" style="color:#1a73e8; text-decoration:none; font-size:13px;">${c.email}</a></div>
-                    <small style="color:#64748b;">${c.phone || '-'}</small>
+                    <div><a href="mailto:${escapeHtml(c.email)}" style="color:#1a73e8; text-decoration:none; font-size:13px;">${escapeHtml(c.email)}</a></div>
+                    <small style="color:#64748b;">${escapeHtml(c.phone || '-')}</small>
                 </td>
                 <td>
-                    <div style="font-weight:500; font-size:13px;">${c.city || '—'}</div>
-                    <small style="color:#64748b;">${c.address || ''}</small>
+                    <div style="font-weight:500; font-size:13px;">${escapeHtml(c.city || '—')}</div>
+                    <small style="color:#64748b;">${escapeHtml(c.address || '')}</small>
                 </td>
                 <td>${portalStatus}</td>
                 <td style="text-align: center;">
@@ -148,6 +151,16 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    function escapeHtml(text) {
+        if (!text) return "";
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     // Enregistrement d'un nouveau client
     clientForm.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -159,9 +172,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const phone = document.getElementById("client-phone").value.trim();
         const city = document.getElementById("client-city").value.trim();
         const address = document.getElementById("client-address").value.trim();
-        const hasPortal = document.getElementById("client-portal-access").checked;
+        const hasPortal = document.getElementById("client-portal-access") ? document.getElementById("client-portal-access").checked : false;
 
-        const list = getDemoClients();
+        const list = getTenantClients();
         const newId = list.length > 0 ? Math.max(...list.map(c => c.id)) + 1 : 1;
         const newClient = {
             id: newId,
@@ -177,12 +190,13 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         list.unshift(newClient);
-        localStorage.setItem("demo_clients", JSON.stringify(list));
+        saveTenantClients(list);
 
-        // Si l'accès portail client est activé, créer automatiquement l'utilisateur externe
-        if (hasPortal) {
-            let tenantUsers = JSON.parse(localStorage.getItem("demo_tenant_users") || "[]");
-            const existingUser = tenantUsers.find(u => u.email === email);
+        // Si l'accès portail client est activé, inscrire le tiers dans les accès de l'entreprise
+        if (hasPortal && window.NexaTenant) {
+            const tenantId = window.NexaTenant.getTenantId();
+            const tenantUsers = window.NexaTenant.getData('users', []);
+            const existingUser = tenantUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
             if (!existingUser) {
                 tenantUsers.push({
                     id: tenantUsers.length + 1,
@@ -192,21 +206,28 @@ document.addEventListener("DOMContentLoaded", () => {
                     is_active: true,
                     is_two_factor_enabled: false
                 });
-                localStorage.setItem("demo_tenant_users", JSON.stringify(tenantUsers));
+                window.NexaTenant.setData('users', tenantUsers);
+                window.NexaTenant.registerUser({
+                    email: email,
+                    tenant_id: tenantId,
+                    username: name,
+                    password: 'password123',
+                    user_type: 'external'
+                });
             }
         }
 
         modal.style.display = "none";
         clientForm.reset();
         fetchClients();
-        alert(`Client "${name}" enregistré avec succès !`);
+        alert(`✅ Client « ${name} » enregistré avec succès dans votre espace entreprise !`);
     });
 
     function handleDeleteClient(clientId) {
         if (!confirm("Voulez-vous vraiment supprimer ce client ?")) return;
-        let list = getDemoClients();
+        let list = getTenantClients();
         list = list.filter(c => String(c.id) !== String(clientId));
-        localStorage.setItem("demo_clients", JSON.stringify(list));
+        saveTenantClients(list);
         fetchClients();
     }
 

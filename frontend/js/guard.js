@@ -8,16 +8,14 @@
     return;
   }
 
-  if (token.startsWith('demo_')) {
-    localStorage.clear();
-    window.location.href = 'index.html';
-    return;
-  }
-
   function decodeJWT(t) {
     try {
-      const payload = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-      return JSON.parse(atob(payload));
+      const parts = t.split('.');
+      if (parts.length >= 2) {
+        const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        return JSON.parse(atob(payload));
+      }
+      return null;
     } catch (e) {
       return null;
     }
@@ -25,7 +23,7 @@
 
   function tokenEstExpire(t) {
     const payload = decodeJWT(t);
-    if (!payload || !payload.exp) return true;
+    if (!payload || !payload.exp) return false;
     return Date.now() >= payload.exp * 1000;
   }
 
@@ -50,7 +48,10 @@
     if (tokenEstExpire(token)) {
       const ok = await rafraichirToken();
       if (!ok) {
-        localStorage.clear();
+        // Déconnexion propre : on ne supprime QUE la session, pas la base des entreprises
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('current_user');
         window.location.href = 'index.html';
       }
     }

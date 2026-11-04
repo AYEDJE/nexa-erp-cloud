@@ -8,32 +8,25 @@ const isDemo = () => {
 };
 
 async function apiFetch(endpoint) {
-  // Mode Démo / Hors-ligne
+  // Mode Démo / Hors-ligne / Isolée par entreprise
   if (isDemo()) {
     if (endpoint.startsWith('/products/')) {
+      if (window.NexaTenant) {
+        return window.NexaTenant.getData('products', []);
+      }
       const stored = localStorage.getItem('demo_products');
-      if (stored) return JSON.parse(stored);
-      return [
-        { id: 1, name: "Ordinateur Portable Pro 15\"", price: 850.0, stock: 12 },
-        { id: 2, name: "Écran 27\" 4K UHD", price: 320.0, stock: 8 },
-        { id: 3, name: "Clavier Mécanique Sans Fil", price: 89.90, stock: 25 },
-        { id: 4, name: "Souris Ergonomique", price: 45.0, stock: 3 },
-        { id: 5, name: "Imprimante Laser Multifonction", price: 290.0, stock: 0 }
-      ];
+      return stored ? JSON.parse(stored) : [];
     }
     if (endpoint.startsWith('/invoices/')) {
+      if (window.NexaTenant) {
+        return window.NexaTenant.getData('invoices', []);
+      }
       const stored = localStorage.getItem('demo_invoices');
-      if (stored) return JSON.parse(stored);
-      return [
-        { id: 1, number: "FAC-202610-001", total_ttc: 1785.0, status: "paid" },
-        { id: 2, number: "FAC-202610-002", total_ttc: 1011.5, status: "pending" },
-        { id: 3, number: "DEV-202610-003", total_ttc: 3808.0, status: "pending" }
-      ];
+      return stored ? JSON.parse(stored) : [];
     }
     if (endpoint.startsWith('/warehouses/')) {
       return [
-        { id: 1, name: "Entrepôt Principal - Tunis", code: "WH-TUNIS" },
-        { id: 2, name: "Dépôt Logistique - Sfax", code: "WH-SFAX" }
+        { id: 1, name: "Entrepôt Principal", code: "WH-01" }
       ];
     }
     return [];
@@ -52,11 +45,17 @@ async function apiFetch(endpoint) {
       return null;
     }
 
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error("API non disponible");
     return await res.json();
   } catch (err) {
-    console.warn(`Erreur de connexion vers ${endpoint}, repli local :`, err);
-    return null;
+    console.warn(`Erreur de connexion vers ${endpoint}, repli sur les données isolées de l'entreprise :`, err);
+    if (endpoint.startsWith('/products/')) {
+      return window.NexaTenant ? window.NexaTenant.getData('products', []) : [];
+    }
+    if (endpoint.startsWith('/invoices/')) {
+      return window.NexaTenant ? window.NexaTenant.getData('invoices', []) : [];
+    }
+    return [];
   }
 }
 
@@ -76,44 +75,55 @@ function setKpi(id, valeur) {
 
 async function chargerProduits() {
   const data = await apiFetch('/products/');
-  if (!data) return;
+  if (!data) {
+    setKpi('kpi-produits', 0);
+    setKpi('kpi-rupture', 0);
+    return;
+  }
 
   const total    = data.length;
-  const rupture  = data.filter(p => (p.stock || p.stock_quantity || 0) === 0).length;
+  const rupture  = data.filter(p => (parseInt(p.stock ?? p.stock_quantity ?? 0, 10)) <= 0).length;
   setKpi('kpi-produits',  total);
   setKpi('kpi-rupture',   rupture);
 }
 
 async function chargerFactures() {
   const data = await apiFetch('/invoices/');
-  if (!data) return;
+  if (!data || data.length === 0) {
+    setKpi('kpi-ca', '0.00 €');
+    setKpi('kpi-en-attente', 0);
+    return;
+  }
 
   const enAttente = data.filter(f => f.status === 'pending' || f.status === 'draft').length;
   const ca = data
     .filter(f => f.status === 'paid')
     .reduce((sum, f) => sum + (parseFloat(f.total_ttc) || 0), 0);
 
-  setKpi('kpi-ca',         ca.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €');
+  setKpi('kpi-ca', ca.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €');
   setKpi('kpi-en-attente', enAttente);
 }
 
 function chargerClients() {
-  const stored = localStorage.getItem('demo_clients');
-  if (stored) {
-    const list = JSON.parse(stored);
-    setKpi('kpi-clients-total', list.length);
+  let list = [];
+  if (window.NexaTenant) {
+    list = window.NexaTenant.getData('clients', []);
   } else {
-    setKpi('kpi-clients-total', '4');
+    const stored = localStorage.getItem('demo_clients');
+    if (stored) {
+      try { list = JSON.parse(stored); } catch (_) { list = []; }
+    }
   }
+  setKpi('kpi-clients-total', list.length);
 }
 
-async function chargerEntrepots() {
-  const data = await apiFetch('/warehouses/');
-  if (!data) {
-    setKpi('kpi-entrepots', '5');
-    return;
+async function chargerCollaborateurs() {
+  let count = 1;
+  if (window.NexaTenant) {
+    const users = window.NexaTenant.getData('users', []);
+    count = users && users.length > 0 ? users.length : 1;
   }
-  setKpi('kpi-entrepots', data.length);
+  setKpi('kpi-entrepots', count);
 }
 
 function toggleSidebar() {
@@ -121,17 +131,55 @@ function toggleSidebar() {
   if (sidebar) sidebar.classList.toggle('collapsed');
 }
 
+let stockChartInstance = null;
 async function dessinerchartStock() {
   const canvas = document.getElementById('chart-stock');
   if (!canvas) return;
 
   const data = await apiFetch('/products/');
-  if (!data || data.length === 0) return;
+  if (stockChartInstance) {
+    stockChartInstance.destroy();
+    stockChartInstance = null;
+  }
 
-  const noms    = data.map(p => p.name.length > 15 ? p.name.substring(0, 15) + '...' : p.name);
-  const valeurs = data.map(p => (p.price || 0) * (p.stock || p.stock_quantity || 0));
+  if (!data || data.length === 0) {
+    stockChartInstance = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: ['Aucun produit'],
+        datasets: [{
+          label: 'Valeur stock (€)',
+          data: [0],
+          backgroundColor: '#e2e8f0',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false }
+        },
+        scales: {
+          y: { beginAtZero: true, max: 10 }
+        }
+      }
+    });
+    return;
+  }
 
-  new Chart(canvas, {   
+  const noms = data.map(p => {
+    const name = p.name || p.designation || 'Article';
+    return name.length > 15 ? name.substring(0, 15) + '...' : name;
+  });
+  const valeurs = data.map(p => {
+    const price = parseFloat(p.price ?? p.price_ht ?? 0) || 0;
+    const stock = parseInt(p.stock ?? p.stock_quantity ?? 0, 10) || 0;
+    return price * stock;
+  });
+
+  stockChartInstance = new Chart(canvas, {   
     type: 'bar',
     data: {
       labels: noms,
@@ -160,23 +208,55 @@ async function dessinerchartStock() {
   });                                                     
 }
 
+let facturesChartInstance = null;
 async function dessinerchartFactures() {
   const canvas = document.getElementById('chart-factures');
   if (!canvas) return;
 
-  const data = await apiFetch('/invoices/');
-  if (!data || data.length === 0) return;
+  const data = (await apiFetch('/invoices/')) || [];
+  if (facturesChartInstance) {
+    facturesChartInstance.destroy();
+    facturesChartInstance = null;
+  }
 
   const payees    = data.filter(f => f.status === 'paid').length;
   const enAttente = data.filter(f => f.status === 'pending' || f.status === 'draft').length;
   const annulees  = data.filter(f => f.status === 'cancelled').length;
+  const total = payees + enAttente + annulees;
 
-  new Chart(canvas, { 
+  if (total === 0) {
+    facturesChartInstance = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Aucune facture'],
+        datasets: [{
+          data: [1],
+          backgroundColor: ['#e2e8f0'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '70%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { padding: 14, font: { size: 12 } }
+          },
+          tooltip: { enabled: false }
+        }
+      }
+    });
+    return;
+  }
+
+  facturesChartInstance = new Chart(canvas, { 
     type: 'doughnut',
     data: {
       labels: ['Payées', 'En attente', 'Annulées'],
       datasets: [{
-        data: [payees || 1, enAttente || 2, annulees || 0],
+        data: [payees, enAttente, annulees],
         backgroundColor: ['#16a34a', '#d97706', '#dc2626'],
         borderWidth: 0                                    
       }]
@@ -200,7 +280,7 @@ async function init() {
   await chargerProduits();
   await chargerFactures();
   chargerClients();
-  await chargerEntrepots();
+  await chargerCollaborateurs();
   await dessinerchartStock();
   await dessinerchartFactures();
 }
