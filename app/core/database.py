@@ -1,18 +1,19 @@
 import os
 from typing import Generator, Optional
 
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, Request, status
+from jose import JWTError, jwt
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Base métier conservée pour les modèles ERP, à provisionner dans les bases tenant.
+from app.core.config import ALGORITHM, SECRET_KEY
+
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./erp.db")
 _engine_options = {"connect_args": {"check_same_thread": False}} if DATABASE_URL.startswith("sqlite") else {"pool_pre_ping": True}
 engine = create_engine(DATABASE_URL, **_engine_options)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Métadonnées SaaS strictement séparées des modèles métier.
 CENTRAL_DATABASE_URL = os.getenv("CENTRAL_DATABASE_URL", "sqlite:///./nexa_central.db")
 _central_options = {"connect_args": {"check_same_thread": False}} if CENTRAL_DATABASE_URL.startswith("sqlite") else {"pool_pre_ping": True}
 central_engine = create_engine(CENTRAL_DATABASE_URL, **_central_options)
@@ -21,11 +22,10 @@ CentralBase = declarative_base()
 
 
 def ensure_schema_up_to_date(target_engine):
-    """Crée le schéma métier et ajoute les colonnes SQLite historiques manquantes."""
+    """Crée le schéma ERP et migre les colonnes SQLite historiques connues."""
     Base.metadata.create_all(bind=target_engine)
     if target_engine.dialect.name != "sqlite":
         return
-
     with target_engine.begin() as conn:
         columns = conn.execute(text("PRAGMA table_info(users)")).fetchall()
         if not columns:
@@ -55,18 +55,46 @@ def get_central_db() -> Generator:
         db.close()
 
 
-def get_db(x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID")) -> Generator:
-    """Compatibilité historique. Les routes tenant doivent migrer vers le tenant du JWT.
+def _get_verified_tenant_id(request: Request) -> Optional[str]:
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(None, 1)[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Jeton invalide ou expiré.") from exc
+    tenant_id = payload.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Tenant absent du jeton.")
+    return tenant_id
 
-    Le header est encore utilisé par les routes et tests existants; ne l'exposez pas
-    comme mécanisme d'autorisation en production. Le routage JWT/registre est le
-    prochain volet de migration, car l'authentification actuelle ne l'utilise pas encore.
-    """
-    if x_tenant_id and x_tenant_id.strip():
+
+def get_db(request: Request, x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID")) -> Generator:
+    """Ouvre la base du tenant signé dans le JWT; header legacy en développement seulement."""
+    tenant_id = _get_verified_tenant_id(request)
+    if tenant_id:
+        # Le registre central est la source de vérité pour statut et existence du tenant.
+        from app.models.tenant_registry import CompanyRegistryORM
+        central = CentralSessionLocal()
+        try:
+            company = central.query(CompanyRegistryORM).filter_by(tenant_id=tenant_id).first()
+            if not company or company.status != "active":
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Environnement d'entreprise inactif ou inconnu.")
+        finally:
+            central.close()
         from app.core.tenant_db import get_tenant_sessionmaker
-        db = get_tenant_sessionmaker(x_tenant_id.strip())()
+        db = get_tenant_sessionmaker(tenant_id)()
+    elif x_tenant_id and os.getenv("APP_ENV", "development").lower() != "production":
+        # Compatibilité tests/développement; jamais autorisée en production.
+        from app.core.tenant_db import get_tenant_sessionmaker
+        db = get_tenant_sessionmaker(x_tenant_id.strip(), allow_unregistered=True)()
     else:
-        db = SessionLocal()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentification requise pour sélectionner la base de l'entreprise.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
         yield db
     finally:

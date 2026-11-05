@@ -1,27 +1,32 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
-from app.core.database import Base
 
-class CompanyRegistryORM(Base):
-    __tablename__ = "company_registry"
+from sqlalchemy import Boolean, Column, DateTime, Index, Integer, String
 
-    id = Column(Integer, primary_key=True, index=True)
+from app.core.database import CentralBase
+
+
+class CompanyRegistryORM(CentralBase):
+    """Registre central: métadonnées SaaS uniquement, sans données ERP métier."""
+
+    __tablename__ = "saas_companies"
+
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(String(80), unique=True, index=True, nullable=False)
-    company_name = Column(String(150), nullable=False)
-    domain = Column(String(100), nullable=True)
-    db_name = Column(String(120), nullable=False)
-    status = Column(String(30), default="pending")  # pending, active, suspended, refused
-    is_trial = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    company_name = Column(String(200), nullable=False)
+    database_name = Column(String(120), unique=True, nullable=False)
+    status = Column(String(30), nullable=False, default="provisioning", index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     activated_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-class TenantUserRegistryORM(Base):
-    __tablename__ = "tenant_user_registry"
 
-    id = Column(Integer, primary_key=True, index=True)
+class TenantUserRegistryORM(CentralBase):
+    """Index central minimal pour router le login vers la base de l'utilisateur."""
+
+    __tablename__ = "saas_tenant_users"
+    __table_args__ = (Index("ix_saas_tenant_user_email_tenant", "email", "tenant_id", unique=True),)
+
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(String(80), index=True, nullable=False)
-    email = Column(String(150), index=True, nullable=False)
-    user_type = Column(String(50), default="admin")
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    email = Column(String(320), index=True, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

@@ -7,11 +7,7 @@ from app.models.tenant_registry import CompanyRegistryORM
 
 
 def provision_new_tenant(tenant_id: str, company_name: str = "Entreprise") -> dict:
-    """Provisionne une base ERP isolée et consigne son état dans le registre central.
-
-    La création est idempotente. PostgreSQL requiert un compte de service autorisé
-    à créer des bases; SQLite est destiné au développement et aux tests.
-    """
+    """Crée une base métier isolée et consigne son état dans le registre SaaS."""
     normalized = normalize_tenant_id(tenant_id)
     database_name = tenant_database_name(normalized)
     central = CentralSessionLocal()
@@ -19,14 +15,8 @@ def provision_new_tenant(tenant_id: str, company_name: str = "Entreprise") -> di
         record = central.query(CompanyRegistryORM).filter_by(tenant_id=normalized).first()
         if record and record.status == "active":
             return {"tenant_id": normalized, "database_name": record.database_name, "status": record.status}
-
         if record is None:
-            record = CompanyRegistryORM(
-                tenant_id=normalized,
-                company_name=(company_name or "Entreprise").strip()[:200],
-                database_name=database_name,
-                status="provisioning",
-            )
+            record = CompanyRegistryORM(tenant_id=normalized, company_name=(company_name or "Entreprise").strip()[:200], database_name=database_name, status="provisioning")
             central.add(record)
             central.commit()
 
@@ -34,13 +24,10 @@ def provision_new_tenant(tenant_id: str, company_name: str = "Entreprise") -> di
             admin_url = make_url(BASE_DATABASE_URL).set(database="postgres")
             admin_engine = create_engine(str(admin_url), isolation_level="AUTOCOMMIT", pool_pre_ping=True)
             try:
-                # Identifiant validé par regex stricte avant interpolation SQL.
                 with admin_engine.connect() as conn:
-                    exists = conn.execute(
-                        text("SELECT 1 FROM pg_database WHERE datname = :name"),
-                        {"name": database_name},
-                    ).scalar()
+                    exists = conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": database_name}).scalar()
                     if not exists:
+                        # database_name is generated from a strict allowlist regex.
                         conn.execute(text(f'CREATE DATABASE "{database_name}"'))
             finally:
                 admin_engine.dispose()
