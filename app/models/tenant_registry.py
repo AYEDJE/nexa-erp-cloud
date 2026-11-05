@@ -15,3 +15,13 @@ class CompanyRegistryORM(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     activated_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class TenantUserRegistryORM(Base):
+    __tablename__ = "tenant_user_registry"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(80), index=True, nullable=False)
+    email = Column(String(150), index=True, nullable=False)
+    user_type = Column(String(50), default="admin")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
