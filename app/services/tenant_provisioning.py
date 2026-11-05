@@ -1,25 +1,54 @@
 from sqlalchemy import create_engine, text
-from app.core.database import Base
-from app.core.tenant_db import BASE_DATABASE_URL, get_tenant_database_url
+from sqlalchemy.engine import make_url
+
+from app.core.database import Base, CentralSessionLocal
+from app.core.tenant_db import BASE_DATABASE_URL, get_tenant_database_url, normalize_tenant_id, tenant_database_name
+from app.models.tenant_registry import CompanyRegistryORM
 
 
-def provision_new_tenant(tenant_id: str):
-    clean_tenant = tenant_id.lower().replace("-", "_")
-    db_name = f"nexa_tenant_{clean_tenant}"
+def provision_new_tenant(tenant_id: str, company_name: str = "Entreprise") -> dict:
+    """Crée une base métier isolée et consigne son état dans le registre SaaS."""
+    normalized = normalize_tenant_id(tenant_id)
+    database_name = tenant_database_name(normalized)
+    central = CentralSessionLocal()
+    try:
+        record = central.query(CompanyRegistryORM).filter_by(tenant_id=normalized).first()
+        if record and record.status == "active":
+            return {"tenant_id": normalized, "database_name": record.database_name, "status": record.status}
+        if record is None:
+            record = CompanyRegistryORM(tenant_id=normalized, company_name=(company_name or "Entreprise").strip()[:200], database_name=database_name, status="provisioning")
+            central.add(record)
+            central.commit()
 
-    if not BASE_DATABASE_URL.startswith("sqlite"):
-        default_engine = create_engine(f"{BASE_DATABASE_URL.rstrip('/')}/postgres", isolation_level="AUTOCOMMIT")
-        with default_engine.connect() as conn:
-            result = conn.execute(
-                text(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}'")
-            )
-            if not result.scalar():
-                conn.execute(text(f'CREATE DATABASE "{db_name}"'))
-                print(f"[OK] Base de données '{db_name}' créée avec succès.")
+        if not BASE_DATABASE_URL.startswith("sqlite"):
+            admin_url = make_url(BASE_DATABASE_URL).set(database="postgres")
+            admin_engine = create_engine(str(admin_url), isolation_level="AUTOCOMMIT", pool_pre_ping=True)
+            try:
+                with admin_engine.connect() as conn:
+                    exists = conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": database_name}).scalar()
+                    if not exists:
+                        # database_name is generated from a strict allowlist regex.
+                        conn.execute(text(f'CREATE DATABASE "{database_name}"'))
+            finally:
+                admin_engine.dispose()
 
-    tenant_db_url = get_tenant_database_url(tenant_id)
-    connect_args = {"check_same_thread": False} if tenant_db_url.startswith("sqlite") else {}
-    tenant_engine = create_engine(tenant_db_url, connect_args=connect_args)
+        tenant_url = get_tenant_database_url(normalized)
+        options = {"connect_args": {"check_same_thread": False}} if tenant_url.startswith("sqlite") else {"pool_pre_ping": True}
+        tenant_engine = create_engine(tenant_url, **options)
+        try:
+            Base.metadata.create_all(bind=tenant_engine)
+        finally:
+            tenant_engine.dispose()
 
-    Base.metadata.create_all(bind=tenant_engine)
-    print(f"[OK] Schéma de tables initialisé pour le Tenant '{tenant_id}'.")
+        record.status = "active"
+        central.commit()
+        return {"tenant_id": normalized, "database_name": database_name, "status": "active"}
+    except Exception:
+        central.rollback()
+        record = central.query(CompanyRegistryORM).filter_by(tenant_id=normalized).first()
+        if record:
+            record.status = "provisioning_failed"
+            central.commit()
+        raise
+    finally:
+        central.close()
