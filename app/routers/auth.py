@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import LOCKOUT_DURATION_MINUTES, MAX_FAILED_LOGIN_ATTEMPTS
@@ -20,6 +21,7 @@ from app.core.security import (
     get_client_ip,
     get_password_hash,
     get_totp_uri,
+    normalize_email,
     parse_user_agent,
     verify_password,
     verify_totp_code,
@@ -45,7 +47,10 @@ router = APIRouter(prefix="/auth", tags=["Authentification & Sécurité"])
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(UserORM).filter(UserORM.email == user_in.email).first()
+    email = normalize_email(str(user_in.email))
+    existing_user = db.query(UserORM).filter(
+        func.lower(func.trim(UserORM.email)) == email
+    ).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -55,7 +60,7 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
     hashed_pwd = get_password_hash(user_in.password)
     new_user = UserORM(
         tenant_id=user_in.tenant_id,
-        email=user_in.email,
+        email=email,
         hashed_password=hashed_pwd,
         user_type=user_in.user_type,
     )
@@ -78,7 +83,10 @@ def login_for_access_token(
     ua_info = parse_user_agent(request.headers.get("User-Agent"))
     device_fp = compute_device_fingerprint(client_ip, request.headers.get("User-Agent", ""))
 
-    user = db.query(UserORM).filter(UserORM.email == form_data.username).first()
+    normalized_email = normalize_email(form_data.username)
+    user = db.query(UserORM).filter(
+        func.lower(func.trim(UserORM.email)) == normalized_email
+    ).first()
 
     # Protection contre le Brute Force (Vérification de verrouillage de compte)
     if user and user.locked_until and user.locked_until > datetime.utcnow():
@@ -93,7 +101,6 @@ def login_for_access_token(
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
                 user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
-                # Alerte de sécurité
                 alert = SecurityAlertORM(
                     tenant_id=user.tenant_id,
                     user_id=user.id,
@@ -117,18 +124,15 @@ def login_for_access_token(
             detail="Compte utilisateur inactif.",
         )
 
-    # Réinitialisation des tentatives de brute-force après mot de passe correct
     user.failed_login_attempts = 0
     user.locked_until = None
 
-    # Contrôle de l'appareil : vérification si bloqué
     device = db.query(UserDeviceORM).filter(
         UserDeviceORM.user_id == user.id,
         UserDeviceORM.device_identifier == device_fp
     ).first()
 
     if device and device.status == "blocked":
-        # Alerte tentative d'accès via appareil bloqué
         alert = SecurityAlertORM(
             tenant_id=user.tenant_id,
             user_id=user.id,
@@ -144,7 +148,6 @@ def login_for_access_token(
             detail="Cet appareil a été bloqué par mesure de sécurité. Contactez votre administrateur.",
         )
 
-    # Détection de connexion inhabituelle (Changement d'IP)
     if user.last_login_ip and user.last_login_ip != client_ip:
         alert = SecurityAlertORM(
             tenant_id=user.tenant_id,
@@ -161,7 +164,6 @@ def login_for_access_token(
         )
         db.add(alert)
 
-    # Si 2FA est activé sur le compte, émettre un token temporaire intermédiaire
     if user.is_two_factor_enabled:
         temp_token = create_temp_2fa_token({
             "sub": user.email,
@@ -177,7 +179,6 @@ def login_for_access_token(
             "token_type": "bearer"
         }
 
-    # Mise à jour de l'appareil
     if not device:
         device = UserDeviceORM(
             tenant_id=user.tenant_id,
@@ -194,7 +195,6 @@ def login_for_access_token(
         device.last_seen = datetime.utcnow()
         device.last_ip = client_ip
 
-    # Création des jetons JWT
     payload_base = {
         "sub": user.email,
         "tenant_id": user.tenant_id,
@@ -205,7 +205,6 @@ def login_for_access_token(
     payload_base["jti"] = jti
     access_token = create_access_token(payload_base)
 
-    # Enregistrement de la session active
     new_session = UserSessionORM(
         tenant_id=user.tenant_id,
         user_id=user.id,
@@ -259,10 +258,7 @@ def verify_2fa_login(
             detail="2FA non configuré pour cet utilisateur.",
         )
 
-    # Vérification code TOTP
     code_valid = verify_totp_code(user.two_factor_secret, req_body.code)
-
-    # Vérification code de secours si TOTP échoue
     if not code_valid and user.backup_codes:
         backup_list = [c.strip() for c in user.backup_codes.split(",") if c.strip()]
         if req_body.code.strip().upper() in backup_list:
@@ -334,11 +330,7 @@ def setup_two_factor(
     user.backup_codes = ",".join(backup_codes)
     db.commit()
 
-    return {
-        "secret": secret,
-        "otpauth_url": otp_uri,
-        "backup_codes": backup_codes
-    }
+    return {"secret": secret, "otpauth_url": otp_uri, "backup_codes": backup_codes}
 
 
 @router.post("/2fa/enable")
@@ -399,10 +391,7 @@ def refresh_access_token(body: RefreshTokenRequest, db: Session = Depends(get_db
             detail="Session expirée ou révoquée. Veuillez vous reconnecter.",
         )
 
-    # Mise à jour activité
     session.last_active_at = datetime.utcnow()
-
-    # Création du nouvel Access Token
     new_access_token = create_access_token({
         "sub": payload["sub"],
         "tenant_id": payload["tenant_id"],
@@ -476,8 +465,8 @@ def revoke_other_sessions(
         UserSessionORM.is_revoked == False
     ).all()
 
-    for s in sessions:
-        s.is_revoked = True
+    for session in sessions:
+        session.is_revoked = True
 
     db.commit()
     return {"message": f"{len(sessions)} autre(s) session(s) révoquée(s)."}
