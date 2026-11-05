@@ -1,12 +1,10 @@
-window.API = window.API || 'http://127.0.0.1:8000';
-var API = window.API;
+window.API = window.API || (
+  window.location.protocol === 'file:' ||
+  ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+    ? 'http://127.0.0.1:8000'
+    : window.location.origin
+);
 
-/**
- * ============================================================================
- * NEXA MULTI-TENANT ENGINE & REGISTRY
- * Isolation stricte des données par entreprise (Tenant) et vérification des comptes
- * ============================================================================
- */
 window.NexaTenant = {
   REGISTRY_KEY: 'nexa_registered_users',
 
@@ -194,10 +192,6 @@ window.NexaTenant = {
 // Initialiser le registre si nécessaire dès le chargement
 window.NexaTenant.getRegisteredUsers();
 
-/* ============================================================================
-   GESTION DES SESSIONS & AUTHENTIFICATION
-   ============================================================================ */
-
 function getToken() {
   return localStorage.getItem('access_token');
 }
@@ -241,47 +235,53 @@ async function logout() {
   clearTokens();
   redirectToLogin();
 }
-
-/* ============================================================================
-   SOUMISSION DU FORMULAIRE DE CONNEXION AVEC VÉRIFICATION STRICTE
-   ============================================================================ */
 const loginForm = document.getElementById('login-form');
+
 if (loginForm) {
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const emailInput    = document.getElementById('email')?.value?.trim() || '';
-    const password      = document.getElementById('password')?.value || '';
-    const errorMsg      = document.getElementById('error-msg');
+    // Nettoie l'adresse e-mail avant de l'envoyer à l'API.
+    const emailInput =
+      document.getElementById('email')?.value?.trim().toLowerCase() || '';
+    const password =
+      document.getElementById('password')?.value || '';
+    const errorMsg =
+      document.getElementById('error-msg');
 
     if (!emailInput || !password) {
       if (errorMsg) {
-        errorMsg.textContent = 'Veuillez saisir votre email et votre mot de passe.';
+        errorMsg.textContent =
+          'Veuillez saisir votre email et votre mot de passe.';
         errorMsg.style.display = 'block';
       }
       return;
     }
 
-    // 1. TENTATIVE VIA LE SERVEUR BACKEND (s'il est démarré)
-    let backendReachable = false;
+    if (errorMsg) {
+      errorMsg.style.display = 'none';
+    }
+
     try {
       const formData = new FormData();
       formData.append('username', emailInput);
       formData.append('password', password);
 
-      const res = await fetch(`${API}/auth/login`, {
+      const response = await fetch(`${API}/auth/login`, {
         method: 'POST',
         body: formData
       });
 
-      backendReachable = true;
-      const data = await res.json();
+      const data = await response.json();
 
-      if (!res.ok) {
-        // Le backend est actif mais refuse la connexion (compte inexistant ou mauvais mot de passe)
-        const detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+      if (!response.ok) {
+        const detail =
+          typeof data.detail === 'string'
+            ? data.detail
+            : 'E-mail ou mot de passe incorrect.';
+
         if (errorMsg) {
-          errorMsg.textContent = detail || "Identifiants incorrects ou compte non inscrit.";
+          errorMsg.textContent = detail;
           errorMsg.style.display = 'block';
         }
         return;
@@ -293,15 +293,23 @@ if (loginForm) {
         return;
       }
 
-      // Connexion backend réussie : décodage du JWT pour récupérer le tenant_id
       saveTokens(data.access_token, data.refresh_token);
+
       let tenantId = 'default_tenant';
       let userType = 'admin';
+
       try {
-        const payload = JSON.parse(atob(data.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-        if (payload.tenant_id) tenantId = payload.tenant_id;
-        if (payload.user_type) userType = payload.user_type;
-      } catch (_) {}
+        const payloadPart = data.access_token
+          .split('.')[1]
+          .replace(/-/g, '+')
+          .replace(/_/g, '/');
+
+        const payload = JSON.parse(atob(payloadPart));
+        tenantId = payload.tenant_id || tenantId;
+        userType = payload.user_type || userType;
+      } catch (error) {
+        console.error('Impossible de lire les informations du jeton.', error);
+      }
 
       localStorage.setItem('current_user', JSON.stringify({
         username: emailInput.split('@')[0],
@@ -311,39 +319,15 @@ if (loginForm) {
       }));
 
       window.location.href = 'dashboard.html';
-      return;
+    } catch (error) {
+      console.error('Erreur de connexion au serveur :', error);
 
-    } catch (err) {
-      // Backend inaccessible -> on passe au mode de vérification local
-      backendReachable = false;
-    }
-
-    // 2. MODE DE VÉRIFICATION LOCAL (Live Server / Hors-ligne)
-    // On vérifie STRICTEMENT si l'utilisateur est inscrit dans le registre
-    const verification = window.NexaTenant.verifyCredentials(emailInput, password);
-
-    if (!verification.success) {
       if (errorMsg) {
-        errorMsg.textContent = verification.message;
+        errorMsg.textContent =
+          'Impossible de contacter le serveur. Vérifiez que FastAPI fonctionne sur http://127.0.0.1:8000.';
         errorMsg.style.display = 'block';
       }
-      return;
     }
-
-    // L'utilisateur est bien inscrit et le mot de passe est valide !
-    const verifiedUser = verification.user;
-    const token = window.NexaTenant.createMockJWT(verifiedUser);
-    saveTokens(token, 'refresh_' + Date.now());
-
-    localStorage.setItem('current_user', JSON.stringify({
-      username: verifiedUser.username || verifiedUser.company_name,
-      email: verifiedUser.email,
-      tenant_id: verifiedUser.tenant_id,
-      company_name: verifiedUser.company_name,
-      user_type: verifiedUser.user_type || 'admin'
-    }));
-
-    window.location.href = 'dashboard.html';
   });
 }
 
