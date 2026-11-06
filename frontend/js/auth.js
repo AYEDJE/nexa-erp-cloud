@@ -315,7 +315,12 @@ if (loginForm) {
         username: emailInput.split('@')[0],
         email: emailInput,
         tenant_id: tenantId,
-        user_type: userType
+        user_type: userType,
+        company_name: data.company_name || tenantId,
+        database_name: data.database_name || null,
+        logical_database_name: data.logical_database_name || null,
+        environment_code: data.environment_code || null,
+        workspace: data.workspace || 'entreprise'
       }));
 
       window.location.href = 'dashboard.html';

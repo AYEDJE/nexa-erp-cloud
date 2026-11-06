@@ -9,8 +9,8 @@ from app.core.database import Base
 
 # 1. TYPES D'ACTEURS
 class UserType(str, Enum):
-    SUPER_ADMIN = "super_admin"  # Profil 1 : Super Administrateur Plateforme SaaS
-    ADMIN = "admin"              # Profil 2 : Administrateur Client (Admin Entreprise)
+    SUPER_ADMIN = "super_admin"  # Jeton de support plateforme uniquement, pas un compte métier
+    ADMIN = "admin"              # Administrateur de l'entreprise cliente
     STAFF = "staff"              # Profil 3 : Collaborateurs internes (Commercial, Magasinier, etc.)
     EXTERNAL = "external"        # Profil 4 : Utilisateurs Portail Externe (Clients / Fournisseurs)
 
@@ -50,6 +50,11 @@ class UserCreate(BaseModel):
     password: str
     full_name: Optional[str] = None
     user_type: UserType = UserType.STAFF
+    company_name: Optional[str] = None
+    legal_form: Optional[str] = None
+    tax_id: Optional[str] = None
+    activity: Optional[str] = None
+    plan: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -72,3 +77,10 @@ class Token(BaseModel):
     token_type: str = "bearer"
     requires_2fa: bool = False
     temp_token: Optional[str] = None  # Jeton temporaire utilisé pour valider le 2FA
+    tenant_id: Optional[str] = None
+    company_name: Optional[str] = None
+    database_name: Optional[str] = None
+    logical_database_name: Optional[str] = None
+    environment_code: Optional[str] = None
+    user_type: Optional[str] = None
+    workspace: Optional[str] = None

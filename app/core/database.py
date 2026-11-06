@@ -21,6 +21,30 @@ CentralSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=centr
 CentralBase = declarative_base()
 
 
+_CENTRAL_COMPANY_COLUMNS = {
+    "logical_database_name": "TEXT",
+    "environment_code": "TEXT",
+    "locale": "TEXT DEFAULT 'fr'",
+}
+
+
+def ensure_central_schema():
+    """Crée le registre SaaS et ajoute les colonnes manquantes d'une base centrale déjà ouverte."""
+    import app.models.tenant_registry  # noqa: F401
+
+    CentralBase.metadata.create_all(bind=central_engine)
+    if central_engine.dialect.name != "sqlite":
+        return
+    with central_engine.begin() as conn:
+        rows = conn.execute(text("PRAGMA table_info(saas_companies)")).fetchall()
+        if not rows:
+            return
+        existing = {row[1] for row in rows}
+        for name, sql_type in _CENTRAL_COMPANY_COLUMNS.items():
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE saas_companies ADD COLUMN {name} {sql_type}"))
+
+
 def ensure_schema_up_to_date(target_engine):
     """Crée le schéma ERP et migre les colonnes SQLite historiques connues."""
     Base.metadata.create_all(bind=target_engine)

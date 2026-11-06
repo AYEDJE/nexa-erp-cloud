@@ -121,6 +121,11 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         body: JSON.stringify({
           tenant_id: tenantId,
+          company_name: companyName,
+          legal_form: legalStatus,
+          tax_id: taxId || null,
+          activity: document.getElementById('industry-sector')?.value || null,
+          plan: plan,
           email: email,
           password: password,
           full_name: adminFullName,

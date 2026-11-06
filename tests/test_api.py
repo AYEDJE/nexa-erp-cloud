@@ -21,10 +21,9 @@ def test_health():
     assert response.json()["status"] == "ok"
 
 
-def test_whoami():
+def test_whoami_requires_authenticated_company():
     response = client.get("/whoami", headers={"X-Tenant-ID": "test_tenant"})
-    assert response.status_code == 200
-    assert "test_tenant" in response.json()["message"]
+    assert response.status_code == 401
 
 
 def test_complete_auth_session_device_and_mfa_flow():

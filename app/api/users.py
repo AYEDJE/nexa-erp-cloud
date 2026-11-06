@@ -4,13 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import CentralSessionLocal, get_db
 from app.core.tenant import get_current_tenant_id
 from app.core.rbac import RoleChecker
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, normalize_email
 from app.models.rbac import RoleORM
+from app.models.tenant_registry import TenantUserRegistryORM
 from app.models.user import UserORM
 from app.schemas.user import UserResponse, UserUpdate
+from app.services.tenant_provisioning import initialize_tenant_base_data
 
 router = APIRouter(prefix="/users", tags=["Users Management"])
 
@@ -23,6 +25,10 @@ ROLE_CATALOG = {
     "finance":      ("Responsable Financier et Comptable", "staff"),
     "stock":        ("Responsable des Stocks et Magasinier", "staff"),
     "achats":       ("Responsable des Achats", "staff"),
+    "rh":           ("Ressources Humaines", "staff"),
+    "marketing":    ("Marketing", "staff"),
+    "support":      ("Support / Service Client", "staff"),
+    "production":   ("Production", "staff"),
     "staff":        ("Collaborateur Standard", "staff"),
     "admin":        ("Administrateur Adjoint", "admin"),
     "client_ext":   ("Client Partenaire", "external"),
@@ -38,6 +44,28 @@ class UserCreateByAdmin(BaseModel):
     password: str = Field(min_length=8)
     user_type: Optional[str] = None
     role: Optional[str] = None
+
+
+def _sync_routing(tenant_id: str, email: str, is_active: bool, previous_email: str = None) -> None:
+    """Le login SaaS retrouve l'entreprise via cet index, pas via les données métier."""
+    central = CentralSessionLocal()
+    try:
+        row = None
+        if previous_email:
+            row = central.query(TenantUserRegistryORM).filter_by(tenant_id=tenant_id, email=normalize_email(previous_email)).first()
+        if row is None:
+            row = central.query(TenantUserRegistryORM).filter_by(tenant_id=tenant_id, email=email).first()
+        if row:
+            row.email = email
+            row.is_active = bool(is_active)
+        else:
+            central.add(TenantUserRegistryORM(tenant_id=tenant_id, email=email, is_active=bool(is_active)))
+        central.commit()
+    except Exception:
+        central.rollback()
+        raise
+    finally:
+        central.close()
 
 
 def _role_names(db: Session, tenant_id: str) -> dict:
@@ -78,7 +106,9 @@ def create_tenant_user(
     db: Session = Depends(get_db),
 ):
     """Crée un utilisateur dans l'entreprise de l'admin connecté."""
-    if db.query(UserORM).filter(UserORM.email == data.email).first():
+    initialize_tenant_base_data(tenant_id)
+    email = normalize_email(str(data.email))
+    if db.query(UserORM).filter(UserORM.email == email).first():
         raise HTTPException(status_code=400, detail="Un utilisateur avec cet e-mail existe déjà.")
 
     role_label, user_type = (None, data.user_type or "staff")
@@ -101,7 +131,7 @@ def create_tenant_user(
 
     user = UserORM(
         tenant_id=tenant_id,
-        email=data.email,
+        email=email,
         full_name=(data.full_name or "").strip() or None,
         hashed_password=get_password_hash(data.password),
         user_type=user_type,
@@ -111,6 +141,7 @@ def create_tenant_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+    _sync_routing(tenant_id, email, True)
     return _to_response(user, _role_names(db, tenant_id))
 
 
@@ -138,6 +169,7 @@ def update_user(
     user = db.query(UserORM).filter(UserORM.id == user_id, UserORM.tenant_id == tenant_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    previous_email = user.email
 
     if user_update.is_active is not None:
         if user.id == current_user.get("user_id") and user_update.is_active is False:
@@ -153,8 +185,13 @@ def update_user(
         user.user_type = user_update.user_type
 
     if user_update.email is not None:
-        user.email = user_update.email
+        new_email = normalize_email(str(user_update.email))
+        taken = db.query(UserORM).filter(UserORM.email == new_email, UserORM.id != user.id).first()
+        if taken:
+            raise HTTPException(status_code=400, detail="Un utilisateur avec cet e-mail existe déjà.")
+        user.email = new_email
 
     db.commit()
     db.refresh(user)
+    _sync_routing(tenant_id, user.email, bool(user.is_active), previous_email=previous_email)
     return _to_response(user, _role_names(db, tenant_id))
