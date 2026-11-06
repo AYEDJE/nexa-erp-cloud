@@ -20,7 +20,7 @@ from app.models.tenant_registry import CompanyRegistryORM, TenantUserRegistryORM
 from app.models.user import Token, UserCreate, UserORM, UserResponse, UserType
 from app.models.security import UserDeviceORM, UserSessionORM
 from app.services.saas_platform_service import ALLOWED_PLANS, record_login_event
-from app.services.tenant_provisioning import initialize_tenant_base_data, provision_new_tenant
+from app.services.tenant_provisioning import provision_new_tenant
 
 router = APIRouter(prefix="/auth", tags=["SaaS authentification"])
 
@@ -50,28 +50,26 @@ def register_user(user_in: UserCreate, central: Session = Depends(get_central_db
         raise HTTPException(status_code=400, detail="Cet utilisateur existe déjà dans cette entreprise.")
 
     company = central.query(CompanyRegistryORM).filter_by(tenant_id=tenant_id).first()
-    if company is None:
-        if user_in.user_type != UserType.ADMIN:
-            raise HTTPException(status_code=422, detail="Le premier compte d'une entreprise doit être son administrateur.")
-        provision_new_tenant(
-            tenant_id,
-            company_name=user_in.company_name or tenant_id,
-            plan=plan,
-            legal_form=user_in.legal_form,
-            tax_id=user_in.tax_id,
-            activity=user_in.activity,
+    if company is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"L'entreprise « {company.company_name} » existe déjà. "
+                "Une nouvelle inscription ne rejoint pas une entreprise existante. "
+                "Choisissez un autre nom, ou connectez-vous pour ajouter un collaborateur depuis l'espace de cette entreprise."
+            ),
         )
-        company = central.query(CompanyRegistryORM).filter_by(tenant_id=tenant_id).first()
-    elif company.status != "active":
-        raise HTTPException(status_code=403, detail="L'environnement de cette entreprise n'est pas actif.")
-    else:
-        initialize_tenant_base_data(
-            tenant_id,
-            company_name=company.company_name,
-            legal_form=user_in.legal_form,
-            tax_id=user_in.tax_id,
-            activity=user_in.activity,
-        )
+    if user_in.user_type != UserType.ADMIN:
+        raise HTTPException(status_code=422, detail="Le premier compte d'une entreprise doit être son administrateur.")
+    provision_new_tenant(
+        tenant_id,
+        company_name=user_in.company_name or tenant_id,
+        plan=plan,
+        legal_form=user_in.legal_form,
+        tax_id=user_in.tax_id,
+        activity=user_in.activity,
+    )
+    company = central.query(CompanyRegistryORM).filter_by(tenant_id=tenant_id).first()
 
     factory = get_tenant_sessionmaker(tenant_id)
     tenant_db = factory()

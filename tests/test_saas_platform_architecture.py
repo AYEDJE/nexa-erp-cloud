@@ -98,7 +98,32 @@ def test_business_data_stays_inside_the_company_database():
     assert [item["name"] for item in left_products.json()] == ["Pièce Alpha"]
 
 
-def test_first_account_must_be_company_admin_and_super_admin_is_not_a_tenant_user():
+def test_public_registration_does_not_join_an_existing_company():
+    suffix = uuid.uuid4().hex[:8]
+    tenant = f"isolee-{suffix}"
+    password = "StrongPassword123!"
+    _register(tenant, f"owner-{suffix}@example.com", company_name="Société Isolée")
+    joined = client.post("/auth/register", json={
+        "tenant_id": tenant,
+        "email": f"autre-{suffix}@example.com",
+        "password": password,
+        "user_type": "admin",
+        "company_name": "Société Isolée",
+    })
+    assert joined.status_code == 409, joined.text
+    owner = client.post("/auth/login", data={"username": f"owner-{suffix}@example.com", "password": password}).json()["access_token"]
+    created = client.post(
+        "/users/",
+        json={"email": f"collab-{suffix}@example.com", "password": password, "role": "commercial", "full_name": "Nora Collab"},
+        headers={"Authorization": f"Bearer {owner}"},
+    )
+    assert created.status_code == 201, created.text
+    other = _register(f"autre-{suffix}", f"autre-admin-{suffix}@example.com", company_name="Autre Société")
+    assert other.status_code == 201
+    other_token = client.post("/auth/login", data={"username": f"autre-admin-{suffix}@example.com", "password": password}).json()["access_token"]
+    visible = client.get("/users/", headers={"Authorization": f"Bearer {other_token}"})
+    assert visible.status_code == 200, visible.text
+    assert [item["email"] for item in visible.json()] == [f"autre-admin-{suffix}@example.com"]
     suffix = uuid.uuid4().hex[:8]
     staff = client.post("/auth/register", json={
         "tenant_id": f"staff-{suffix}",

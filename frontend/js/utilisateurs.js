@@ -23,7 +23,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const kpiExternal = document.getElementById("kpi-external-count");
     const kpiMfa = document.getElementById("kpi-mfa-count");
 
-    const isDemo = token.startsWith("demo_");
+    const companyContext = document.getElementById("company-context");
+    if (companyContext && window.NexaTenant) {
+        const sessionUser = window.NexaTenant.getCurrentUser();
+        const companyName = sessionUser.company_name || sessionUser.tenant_id || "votre entreprise";
+        companyContext.textContent = `Entreprise connectée : ${companyName}. Les collaborateurs ci-dessous appartiennent uniquement à cet espace.`;
+    }
     function rolesKey() {
         const tenantId = window.NexaTenant ? window.NexaTenant.getTenantId() : "default";
         return `nexa_${tenantId}_user_roles`;
@@ -123,7 +128,9 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             if (res.status === 401) {
-                localStorage.removeItem("access_token");
+                sessionStorage.removeItem("access_token");
+                sessionStorage.removeItem("refresh_token");
+                sessionStorage.removeItem("current_user");
                 window.location.href = "index.html";
                 return null;
             }
@@ -135,19 +142,17 @@ document.addEventListener("DOMContentLoaded", () => {
             if (res.ok) {
                 const data = await res.json();
                 const users = Array.isArray(data) ? data : (data.items || data.users || data.data || []);
-                saveTenantUsers(users);
                 renderTable(users);
                 updateKPIs(users);
                 return users;
             }
+            throw new Error("Réponse invalide du serveur.");
         } catch (error) {
-            // Backend non disponible ou erreur réseau -> repli sur la base isolée du tenant
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: #991b1b;">Impossible de charger les utilisateurs de cette entreprise. ${escapeHtml(error.message || "")}</td></tr>`;
+            }
+            return null;
         }
-
-        const list = getTenantUsers();
-        renderTable(list);
-        updateKPIs(list);
-        return list;
     }
 
     function updateKPIs(list) {

@@ -27,7 +27,7 @@ def test_whoami_requires_authenticated_company():
 
 
 def test_complete_auth_session_device_and_mfa_flow():
-    tenant_id = "tenant_security"
+    tenant_id = f"tenant-security-{__import__('uuid').uuid4().hex[:8]}"
     common_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
         "X-Tenant-ID": tenant_id
@@ -117,7 +117,7 @@ def test_complete_auth_session_device_and_mfa_flow():
 
 
 def test_device_management_and_security_alerts():
-    tenant_id = "tenant_devices"
+    tenant_id = f"tenant-devices-{__import__('uuid').uuid4().hex[:8]}"
     headers = {
         "User-Agent": "Mozilla/5.0 Firefox/115.0",
         "X-Tenant-ID": tenant_id
@@ -163,7 +163,7 @@ def test_device_management_and_security_alerts():
 
 
 def test_products_and_invoices_flow():
-    tenant_id = "tenant_erp"
+    tenant_id = f"tenant-erp-{__import__('uuid').uuid4().hex[:8]}"
     headers = {"X-Tenant-ID": tenant_id}
     email = f"staff_{__import__('uuid').uuid4().hex[:6]}@example.com"
     pwd = "StaffPassword123!"
@@ -205,9 +205,10 @@ def test_products_and_invoices_flow():
     assert pdf_res.headers["content-type"] == "application/pdf"
 
 
-def _company_headers(tenant_id: str) -> dict:
+def _company_headers(prefix: str) -> dict:
     """Ouvre une session réelle : le routage vient du jeton, pas d'un en-tête libre."""
-    email = f"{tenant_id}_{__import__('uuid').uuid4().hex[:6]}@example.com"
+    tenant_id = f"{prefix}-{__import__('uuid').uuid4().hex[:8]}"
+    email = f"{prefix}-{__import__('uuid').uuid4().hex[:6]}@example.com"
     password = "StrongPassword123!"
     registered = client.post("/auth/register", json={
         "tenant_id": tenant_id,
@@ -307,7 +308,7 @@ def test_smart_ocr_and_data_extraction():
 
 
 def test_global_cross_module_search():
-    tenant_id = "tenant_search"
+    tenant_id = f"tenant-search-{__import__('uuid').uuid4().hex[:8]}"
     headers = {"X-Tenant-ID": tenant_id}
     email = f"search_admin_{__import__('uuid').uuid4().hex[:6]}@example.com"
     pwd = "SearchPassword123!"
@@ -332,7 +333,7 @@ def test_global_cross_module_search():
 
 
 def test_tenant_backup_export_and_restore():
-    tenant_id = "tenant_backup_test"
+    tenant_id = f"tenant-backup-{__import__('uuid').uuid4().hex[:8]}"
     headers = {"X-Tenant-ID": tenant_id}
     email = f"backup_admin_{__import__('uuid').uuid4().hex[:6]}@example.com"
     pwd = "BackupPassword123!"
