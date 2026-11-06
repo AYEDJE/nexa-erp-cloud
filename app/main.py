@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, FastAPI
+from datetime import datetime
+
+from fastapi import Depends, FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api import warehouse, invoices, products, users, ai
@@ -9,14 +11,14 @@ from app.api.ocr import router as ocr_router
 from app.api.search import router as search_router
 from app.api.backups import router as backups_router
 from app.api.company import router as company_router
-from app.routers import auth
 from app.core.database import CentralBase, central_engine
-from app.core.rbac import RoleChecker
 from app.core.middleware import SecurityHeadersMiddleware
+from app.core.rbac import RoleChecker
+from app.core.tenant import get_current_tenant_id
 from app.models.tenant_registry import CompanyRegistryORM, TenantUserRegistryORM
-from app.routers import saas_auth
+from app.routers import auth, saas_auth
 
-# Import all ERP models so their metadata is available to tenant provisioning.
+# Import all ERP models so Base.metadata includes their tables for tenant provisioning.
 from app.models.user import UserORM
 from app.models.product import ProductORM
 from app.models.rbac import PermissionORM, RoleORM
@@ -28,21 +30,11 @@ import app.models.audit
 
 CentralBase.metadata.create_all(bind=central_engine)
 
-app = FastAPI(
-    title="NexaERP Cloud API",
-    description="Backend SaaS Multi-Tenant avec registre central et bases ERP isolées par entreprise",
-    version="2.6.0",
-)
+app = FastAPI(title="NexaERP Cloud API", description="SaaS multi-tenant avec bases ERP isolées par entreprise", version="2.7.0")
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# Register central SaaS auth endpoints before legacy endpoints with the same paths.
+# SaaS auth endpoints come first to avoid legacy endpoints shadowing them.
 app.include_router(saas_auth.router)
 app.include_router(auth.router)
 app.include_router(products.router)
@@ -63,17 +55,16 @@ allow_admin_only = RoleChecker(["admin", "super_admin"])
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "app": "NexaERP Cloud API", "version": "2.6.0", "security": "Central registry and tenant-isolated databases"}
+    return {"status": "online", "app": "NexaERP Cloud API", "version": "2.7.0", "security": "Central registry and tenant-isolated databases"}
 
 
 @app.get("/health")
 def health_check():
-    from datetime import datetime
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.get("/whoami")
-def whoami(tenant_id: str = Depends(__import__("app.core.tenant", fromlist=["get_current_tenant_id"]).get_current_tenant_id)):
+def whoami(tenant_id: str = Depends(get_current_tenant_id)):
     return {"message": f"Vous appartenez à l'entreprise : {tenant_id}"}
 
 

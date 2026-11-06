@@ -6,7 +6,7 @@ from app.core.database import CentralBase
 
 
 class CompanyRegistryORM(CentralBase):
-    """Registre central: métadonnées SaaS uniquement, sans données ERP métier."""
+    """Métadonnées SaaS centrales, sans données ERP métier."""
 
     __tablename__ = "saas_companies"
 
@@ -20,7 +20,7 @@ class CompanyRegistryORM(CentralBase):
 
 
 class TenantUserRegistryORM(CentralBase):
-    """Index central minimal pour router le login vers la base de l'utilisateur."""
+    """Index central minimal pour retrouver le tenant d'un utilisateur au login."""
 
     __tablename__ = "saas_tenant_users"
     __table_args__ = (Index("ix_saas_tenant_user_email_tenant", "email", "tenant_id", unique=True),)

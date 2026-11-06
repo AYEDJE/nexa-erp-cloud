@@ -1,3 +1,4 @@
+import os
 import re
 from typing import Dict
 
@@ -6,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-BASE_DATABASE_URL = __import__("os").getenv("DATABASE_URL", "sqlite:///./erp.db")
+BASE_DATABASE_URL = os.getenv("DATABASE_URL_BASE") or os.getenv("DATABASE_URL", "sqlite:///./erp.db")
 tenant_session_factories: Dict[str, sessionmaker] = {}
 _TENANT_ID_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9_-]{0,78}[a-z0-9])?$")
 
@@ -14,7 +15,7 @@ _TENANT_ID_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9_-]{0,78}[a-z0-9])?$")
 def normalize_tenant_id(tenant_id: str) -> str:
     value = (tenant_id or "").strip().lower().replace(" ", "-")
     if not _TENANT_ID_PATTERN.fullmatch(value):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Identifiant d'entreprise invalide.")
+        raise HTTPException(status_code=422, detail="Identifiant d'entreprise invalide.")
     return value
 
 
@@ -30,18 +31,18 @@ def get_tenant_database_url(tenant_id: str) -> str:
     return str(url.set(database=db_name))
 
 
-def get_tenant_sessionmaker(tenant_id: str, allow_unregistered: bool = False):
+def get_tenant_sessionmaker(tenant_id: str):
     normalized = normalize_tenant_id(tenant_id)
-    if not allow_unregistered:
-        from app.core.database import CentralSessionLocal
-        from app.models.tenant_registry import CompanyRegistryORM
-        central = CentralSessionLocal()
-        try:
-            record = central.query(CompanyRegistryORM).filter_by(tenant_id=normalized, status="active").first()
-            if not record:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Entreprise inconnue ou inactive.")
-        finally:
-            central.close()
+    from app.core.database import CentralSessionLocal
+    from app.models.tenant_registry import CompanyRegistryORM
+
+    central = CentralSessionLocal()
+    try:
+        record = central.query(CompanyRegistryORM).filter_by(tenant_id=normalized, status="active").first()
+        if not record or record.database_name != tenant_database_name(normalized):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Entreprise inconnue ou inactive.")
+    finally:
+        central.close()
 
     if normalized not in tenant_session_factories:
         db_url = get_tenant_database_url(normalized)
