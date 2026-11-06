@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA ERP — Achats</title>
+  <script src="js/guard.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .table-container { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); margin-top: 10px; }
+    .data-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .data-table th, .data-table td { padding: 12px 14px; border-bottom: 1px solid #e5e7eb; font-size: 13px; vertical-align: top; }
+    .data-table th { background-color: #f9fafb; font-weight: 600; color: #4b5563; }
+    .data-table tr:hover { background-color: #f8fafc; }
+    .btn-primary { background: #1a73e8; color: #fff; border: none; padding: 9px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+    .btn-primary:hover { background: #1557b0; }
+    .btn-ghost { background: #fff; color: #334155; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; }
+    .quick-nav-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; }
+    .quick-nav-btn.secondary { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+    .tabs { display: flex; gap: 8px; margin: 8px 0 4px; }
+    .tab { border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 999px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: 13px; }
+    .tab.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+    .status-pill { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; display: inline-block; }
+    .btn-action-small { background: none; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; cursor: pointer; font-size: 12px; color: #334155; }
+    .btn-action-small:hover { background: #f1f5f9; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); overflow-y: auto; }
+    .modal-content { background: #fff; margin: 4% auto; padding: 25px 30px; border-radius: 10px; width: min(760px, 94%); position: relative; }
+    .close-btn { position: absolute; right: 18px; top: 12px; font-size: 24px; cursor: pointer; color: #6b7280; }
+    .form-group { margin-bottom: 14px; display: flex; flex-direction: column; }
+    .form-group label { margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #374151; }
+    .form-group input, .form-group select, .form-group textarea { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .line-row { display: grid; grid-template-columns: 1.2fr 1.2fr 80px 110px 32px; gap: 8px; margin-bottom: 8px; align-items: center; }
+    .hint { color: #64748b; font-size: 13px; margin: 0 0 12px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <h2>NEXA <span>ERP</span></h2>
+        <small>Votre gestion, notre solution</small>
+      </div>
+      <nav class="sidebar-nav">
+        <ul>
+          <li><a href="dashboard.html"><i class="fa-solid fa-house"></i> <span>Tableau de bord</span></a></li>
+          <li><a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Ventes & Factures</span></a></li>
+          <li><a href="produit.html"><i class="fa-solid fa-box-open"></i> <span>Produits & Articles</span></a></li>
+          <li class="active" id="nav-achats"><a href="achats.html"><i class="fa-solid fa-cart-shopping"></i> <span>Achats</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-coins"></i> <span>Paiements & Trésorerie</span></a></li>
+          <li><a href="clients.html"><i class="fa-solid fa-users"></i> <span>Clients</span></a></li>
+          <li id="nav-fournisseurs"><a href="achats.html#fournisseurs"><i class="fa-solid fa-industry"></i> <span>Fournisseurs</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-warehouse"></i> <span>Stock & Entrepôts</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-chart-line"></i> <span>Rapports & Stats</span></a></li>
+        </ul>
+        <p class="nav-section-title">PARAMÈTRES</p>
+        <ul>
+          <li><a href="societe.html"><i class="fa-solid fa-building"></i> <span>Société</span></a></li>
+          <li><a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span>Utilisateurs & Rôles</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button id="toggle-sidebar" type="button">☰</button>
+        <h3 id="page-title">Achats</h3>
+        <div class="topbar-right">
+          <a href="dashboard.html" class="quick-nav-btn secondary"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>
+          <a href="produit.html" class="quick-nav-btn secondary"><i class="fa-solid fa-box-open"></i> Produits</a>
+          <button id="open-supplier-modal" class="btn-primary" type="button"><i class="fa-solid fa-industry"></i> Nouveau fournisseur</button>
+          <button id="open-order-modal" class="btn-primary" type="button"><i class="fa-solid fa-cart-plus"></i> Nouveau bon de commande</button>
+          <div class="user-info">
+            <img id="user-avatar" src="https://ui-avatars.com/api/?name=Admin&background=1a73e8&color=fff" alt="avatar">
+            <span id="user-display-name">Admin</span>
+          </div>
+          <button id="btn-logout" type="button">Déconnexion</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <p class="hint" id="company-context"></p>
+        <section class="kpi-section" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="kpi-card"><p>Fournisseurs actifs</p><h2 id="kpi-suppliers">0</h2></div>
+          <div class="kpi-card"><p>Commandes ouvertes</p><h2 id="kpi-open">0</h2></div>
+          <div class="kpi-card"><p>À réceptionner</p><h2 id="kpi-incoming">0</h2></div>
+          <div class="kpi-card"><p>Montant commandé</p><h2 id="kpi-amount">0</h2></div>
+        </section>
+
+        <div class="tabs">
+          <button class="tab active" type="button" data-tab="commandes">Bons de commande</button>
+          <button class="tab" type="button" data-tab="fournisseurs">Fournisseurs</button>
+        </div>
+
+        <section class="table-container" id="panel-commandes">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Numéro</th>
+                <th>Fournisseur</th>
+                <th>Statut</th>
+                <th>Montant TTC</th>
+                <th>Lignes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="orders-body"></tbody>
+          </table>
+        </section>
+
+        <section class="table-container" id="panel-fournisseurs" hidden>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nom</th>
+                <th>Contact</th>
+                <th>E-mail</th>
+                <th>Téléphone</th>
+                <th>NIF</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody id="suppliers-body"></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal" id="supplier-modal">
+    <div class="modal-content">
+      <span class="close-btn" data-close="supplier-modal">&times;</span>
+      <h3 style="margin-top:0;">Nouveau fournisseur</h3>
+      <form id="supplier-form">
+        <div class="form-group"><label for="supplier-name">Raison sociale</label><input id="supplier-name" required></div>
+        <div class="form-row">
+          <div class="form-group"><label for="supplier-contact">Contact</label><input id="supplier-contact"></div>
+          <div class="form-group"><label for="supplier-phone">Téléphone</label><input id="supplier-phone"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="supplier-email">E-mail</label><input id="supplier-email" type="email"></div>
+          <div class="form-group"><label for="supplier-tax">NIF</label><input id="supplier-tax"></div>
+        </div>
+        <div class="form-group"><label for="supplier-address">Adresse</label><input id="supplier-address"></div>
+        <button class="btn-primary" type="submit">Enregistrer le fournisseur</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="order-modal">
+    <div class="modal-content">
+      <span class="close-btn" data-close="order-modal">&times;</span>
+      <h3 style="margin-top:0;">Bon de commande</h3>
+      <form id="order-form">
+        <div class="form-group">
+          <label for="order-supplier">Fournisseur</label>
+          <select id="order-supplier" required></select>
+        </div>
+        <div class="form-group"><label for="order-notes">Note</label><textarea id="order-notes" rows="2"></textarea></div>
+        <div id="order-lines"></div>
+        <button class="btn-ghost" id="add-line" type="button">Ajouter une ligne</button>
+        <div style="margin-top:16px;">
+          <button class="btn-primary" type="submit">Enregistrer le brouillon</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="receive-modal">
+    <div class="modal-content">
+      <span class="close-btn" data-close="receive-modal">&times;</span>
+      <h3 style="margin-top:0;" id="receive-title">Réception</h3>
+      <p class="hint">La quantité reçue augmente le stock de l'article et le magasin principal.</p>
+      <form id="receive-form"></form>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/achats.js"></script>
+</body>
+</html>

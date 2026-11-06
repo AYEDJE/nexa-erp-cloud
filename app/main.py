@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from app.api import warehouse, invoices, products, users, ai
+from app.api import warehouse, invoices, products, users, ai, purchases
 from app.api.audit import router as audit_router
 from app.api.security_admin import router as security_admin_router
 from app.api.documents import router as documents_router
@@ -23,6 +23,7 @@ from app.models.product import ProductORM
 from app.models.rbac import PermissionORM, RoleORM
 from app.models.invoice import InvoiceItemORM, InvoiceORM
 from app.models.warehouse import StockMovementORM, WarehouseORM
+from app.models.purchase import PurchaseOrderLineORM, PurchaseOrderORM, SupplierORM
 from app.models.security import UserSessionORM, UserDeviceORM, SecurityAlertORM
 from app.models.company import CompanyORM
 import app.models.audit
@@ -52,6 +53,7 @@ app.include_router(products.router)
 app.include_router(users.router)
 app.include_router(invoices.router)
 app.include_router(warehouse.router)
+app.include_router(purchases.router)
 app.include_router(documents_router)
 app.include_router(ocr_router)
 app.include_router(search_router)
