@@ -1,3 +1,30 @@
+function readSession(key) {
+  return sessionStorage.getItem(key) || localStorage.getItem(key);
+}
+
+function writeSession(key, value) {
+  sessionStorage.setItem(key, value);
+  localStorage.setItem(key, value);
+}
+
+function removeSession(key) {
+  sessionStorage.removeItem(key);
+  localStorage.removeItem(key);
+}
+
+function captureTabSession() {
+  if (sessionStorage.getItem('access_token')) return;
+  const access = localStorage.getItem('access_token');
+  if (!access) return;
+  sessionStorage.setItem('access_token', access);
+  ['refresh_token', 'current_user', 'demo_user'].forEach((key) => {
+    const value = localStorage.getItem(key);
+    if (value) sessionStorage.setItem(key, value);
+  });
+}
+
+captureTabSession();
+
 window.API = window.API || (
   window.location.protocol === 'file:' ||
   ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
@@ -121,7 +148,7 @@ window.NexaTenant = {
   // Récupère l'utilisateur actuellement connecté
   getCurrentUser() {
     try {
-      return JSON.parse(localStorage.getItem('current_user') || '{}');
+      return JSON.parse(readSession('current_user') || '{}');
     } catch (e) {
       return {};
     }
@@ -133,7 +160,7 @@ window.NexaTenant = {
     if (user && user.tenant_id) return user.tenant_id;
 
     // Décodage du jeton JWT si présent
-    const token = localStorage.getItem('access_token');
+    const token = readSession('access_token');
     if (token && token.includes('.')) {
       try {
         const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
@@ -193,23 +220,24 @@ window.NexaTenant = {
 window.NexaTenant.getRegisteredUsers();
 
 function getToken() {
-  return localStorage.getItem('access_token');
+  return readSession('access_token');
 }
 
 function getRefreshToken() {
-  return localStorage.getItem('refresh_token');
+  return readSession('refresh_token');
 }
 
 function saveTokens(access, refresh) {
-  localStorage.setItem('access_token', access);
-  localStorage.setItem('refresh_token', refresh);
+  writeSession('access_token', access);
+  if (refresh) writeSession('refresh_token', refresh);
+}
+
+function saveCurrentUser(user) {
+  writeSession('current_user', JSON.stringify(user));
 }
 
 function clearTokens() {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('current_user');
-  localStorage.removeItem('demo_user');
+  ['access_token', 'refresh_token', 'current_user', 'demo_user', 'temp_token'].forEach(removeSession);
 }
 
 function redirectToLogin() {
@@ -288,7 +316,7 @@ if (loginForm) {
       }
 
       if (data.requires_2fa) {
-        localStorage.setItem('temp_token', data.temp_token);
+        writeSession('temp_token', data.temp_token);
         window.location.href = '2fa.html';
         return;
       }
@@ -311,7 +339,7 @@ if (loginForm) {
         console.error('Impossible de lire les informations du jeton.', error);
       }
 
-      localStorage.setItem('current_user', JSON.stringify({
+      saveCurrentUser({
         username: emailInput.split('@')[0],
         email: emailInput,
         tenant_id: tenantId,
@@ -321,7 +349,7 @@ if (loginForm) {
         logical_database_name: data.logical_database_name || null,
         environment_code: data.environment_code || null,
         workspace: data.workspace || 'entreprise'
-      }));
+      });
 
       window.location.href = 'dashboard.html';
     } catch (error) {

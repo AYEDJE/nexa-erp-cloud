@@ -2,7 +2,7 @@ const form = document.getElementById('twofa-form');
 const codeInput = document.getElementById('twofa-code');
 const errorBox = document.getElementById('twofa-error');
 
-const tempToken = localStorage.getItem('temp_token');
+const tempToken = sessionStorage.getItem('temp_token') || localStorage.getItem('temp_token');
 if (!tempToken) {
   window.location.href = 'index.html';
 }
@@ -36,16 +36,21 @@ if (form) {
         return;
       }
 
+      sessionStorage.removeItem('temp_token');
       localStorage.removeItem('temp_token');
+      sessionStorage.setItem('access_token', data.access_token);
       localStorage.setItem('access_token', data.access_token);
+      sessionStorage.setItem('refresh_token', data.refresh_token);
       localStorage.setItem('refresh_token', data.refresh_token);
 
       const payload = JSON.parse(atob(data.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-      localStorage.setItem('current_user', JSON.stringify({
+      const profile = JSON.stringify({
         email: payload.sub,
         tenant_id: payload.tenant_id,
         user_type: payload.user_type || 'admin'
-      }));
+      });
+      sessionStorage.setItem('current_user', profile);
+      localStorage.setItem('current_user', profile);
 
       window.location.href = 'dashboard.html';
     } catch (err) {

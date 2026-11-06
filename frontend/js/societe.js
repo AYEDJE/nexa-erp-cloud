@@ -1,7 +1,7 @@
 const API = window.API || 'http://127.0.0.1:8000';
 
 document.addEventListener("DOMContentLoaded", () => {
-    const token = localStorage.getItem("access_token");
+    const token = sessionStorage.getItem("access_token") || localStorage.getItem("access_token");
     if (!token) {
         window.location.href = "index.html";
         return;

@@ -1,6 +1,14 @@
 (function () {
-  const token        = localStorage.getItem('access_token');
-  const refreshToken = localStorage.getItem('refresh_token');
+  if (!sessionStorage.getItem('access_token') && localStorage.getItem('access_token')) {
+    sessionStorage.setItem('access_token', localStorage.getItem('access_token'));
+    ['refresh_token', 'current_user', 'demo_user'].forEach((key) => {
+      const value = localStorage.getItem(key);
+      if (value) sessionStorage.setItem(key, value);
+    });
+  }
+
+  const token        = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
+  const refreshToken = sessionStorage.getItem('refresh_token') || localStorage.getItem('refresh_token');
   const API          = 'http://127.0.0.1:8000';
 
   if (!token) {
@@ -37,6 +45,7 @@
       });
       if (!res.ok) return false;
       const data = await res.json();
+      sessionStorage.setItem('access_token', data.access_token);
       localStorage.setItem('access_token', data.access_token);
       return true;
     } catch (e) {
@@ -49,9 +58,10 @@
       const ok = await rafraichirToken();
       if (!ok) {
         // Déconnexion propre : on ne supprime QUE la session, pas la base des entreprises
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('current_user');
+        ['access_token', 'refresh_token', 'current_user'].forEach((key) => {
+          sessionStorage.removeItem(key);
+          localStorage.removeItem(key);
+        });
         window.location.href = 'index.html';
       }
     }

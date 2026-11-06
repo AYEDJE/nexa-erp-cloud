@@ -1,7 +1,10 @@
 const API = window.API || 'http://127.0.0.1:8000';
 
 document.addEventListener("DOMContentLoaded", () => {
-    const token = localStorage.getItem("access_token");
+    function currentToken() {
+        return sessionStorage.getItem("access_token") || localStorage.getItem("access_token");
+    }
+    const token = currentToken();
     if (!token) {
         window.location.href = "index.html";
         return;
@@ -21,7 +24,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const kpiMfa = document.getElementById("kpi-mfa-count");
 
     const isDemo = token.startsWith("demo_");
-    const ROLES_KEY = "user_roles";   // mémorise le rôle choisi : { "email": "commercial" }
+    function rolesKey() {
+        const tenantId = window.NexaTenant ? window.NexaTenant.getTenantId() : "default";
+        return `nexa_${tenantId}_user_roles`;
+    }
 
     // ------------------------------------------------------------------
     // Utilitaires
@@ -49,12 +55,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function getSavedRoles() {
-        try { return JSON.parse(localStorage.getItem(ROLES_KEY)) || {}; } catch (_) { return {}; }
+        try { return JSON.parse(localStorage.getItem(rolesKey())) || {}; } catch (_) { return {}; }
     }
     function saveRole(email, roleVal) {
         const roles = getSavedRoles();
         roles[email.toLowerCase()] = roleVal;
-        localStorage.setItem(ROLES_KEY, JSON.stringify(roles));
+        localStorage.setItem(rolesKey(), JSON.stringify(roles));
     }
 
     const ROLE_LABELS = {
@@ -113,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function fetchUsers() {
         try {
             const res = await fetch(`${API}/users/`, {
-                headers: { "Authorization": `Bearer ${token}` }
+                headers: { "Authorization": `Bearer ${currentToken()}` }
             });
 
             if (res.status === 401) {
@@ -254,38 +260,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (roleVal === "admin") userType = "admin";
         else if (roleVal === "client_ext" || roleVal === "supplier_ext") userType = "external";
 
-        // Sauvegarde locale isolée pour l'entreprise connectée
-        const list = getTenantUsers();
-        const newId = list.length > 0 ? Math.max(...list.map(u => u.id)) + 1 : 1;
-        const newUser = {
-            id: newId,
-            full_name: fullName,
-            email: email,
-            role_name: ROLE_LABELS[roleVal] || roleVal,
-            user_type: userType,
-            is_active: true,
-            is_two_factor_enabled: false
-        };
-        list.push(newUser);
-        saveTenantUsers(list);
-        saveRole(email, roleVal);
-
-        // Enregistrer dans le registre global pour permettre la connexion du collaborateur
-        if (window.NexaTenant) {
-            const tenantId = window.NexaTenant.getTenantId();
-            window.NexaTenant.registerUser({
-                email: email,
-                password: password,
-                username: fullName,
-                tenant_id: tenantId,
-                company_name: window.NexaTenant.getCurrentUser()?.company_name || tenantId,
-                role_name: ROLE_LABELS[roleVal] || roleVal,
-                user_type: userType,
-                is_active: true
-            });
-        }
-
-        // Tentative de synchronisation vers le backend
         const payload = {
             full_name: fullName,
             email: email,
@@ -296,20 +270,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (submitBtn) submitBtn.disabled = true;
         try {
-            await fetch(`${API}/users/`, {
+            const res = await fetch(`${API}/users/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
+                    "Authorization": `Bearer ${currentToken()}`
                 },
                 body: JSON.stringify(payload)
             });
-        } catch (_) {}
-
-        modal.style.display = "none";
-        userForm.reset();
-        fetchUsers();
-        alert(tr("user_created", { email }));
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                alert(formatApiError(data, "Impossible de créer cet utilisateur."));
+                if (submitBtn) submitBtn.disabled = false;
+                return;
+            }
+            saveRole(email, roleVal);
+            modal.style.display = "none";
+            userForm.reset();
+            await fetchUsers();
+            alert(tr("user_created", { email }));
+        } catch (_) {
+            alert("Impossible de contacter le serveur. L'utilisateur n'a pas été ajouté.");
+        }
         if (submitBtn) submitBtn.disabled = false;
     });
 
@@ -335,7 +317,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (target) {
                 await fetch(`${API}/users/${userId}`, {
                     method: "PATCH",
-                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentToken()}` },
                     body: JSON.stringify({ is_active: target.is_active })
                 });
             }

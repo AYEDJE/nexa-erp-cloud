@@ -454,7 +454,7 @@
   /* ---------- Utilisateur connecté (topbar) ---------- */
   function updateCurrentUserDisplay() {
     let user = null;
-    const json = localStorage.getItem('current_user') || localStorage.getItem('demo_user');
+    const json = sessionStorage.getItem('current_user') || localStorage.getItem('current_user') || sessionStorage.getItem('demo_user') || localStorage.getItem('demo_user');
     if (json) { try { user = JSON.parse(json); } catch (e) {} }
     const displayName = user?.username || (user?.email ? user.email.split('@')[0] : 'Admin');
     document.querySelectorAll('.user-info span, #user-display-name').forEach(el => {
