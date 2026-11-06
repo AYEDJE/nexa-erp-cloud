@@ -136,7 +136,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (res.status === 403) {
-                throw new Error("Accès réservé aux administrateurs. Votre compte n'a pas les droits pour gérer les utilisateurs.");
+                const denied = await res.json().catch(() => ({}));
+                throw new Error(formatApiError(denied, "Accès réservé à l'administrateur de l'entreprise."));
             }
 
             if (res.ok) {

@@ -135,7 +135,8 @@ def login_for_access_token(
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Compte utilisateur inactif.")
 
-        user_type = str(getattr(user.user_type, "value", user.user_type))
+        from app.core.rbac import canonical_user_type
+        user_type = canonical_user_type(user.user_type)
         if user.is_two_factor_enabled:
             temp_token = create_temp_2fa_token({"sub": user.email, "tenant_id": tenant_id, "user_id": user.id, "user_type": user_type})
             record_login_event(email=email, tenant_id=tenant_id, success=True, ip_address=get_client_ip(request), detail="2fa_challenge")
