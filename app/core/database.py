@@ -1,7 +1,7 @@
 import os
 from typing import Generator, Optional
 
-from fastapi import Header, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -94,31 +94,25 @@ def _get_verified_tenant_id(request: Request) -> Optional[str]:
     return tenant_id
 
 
-def get_db(request: Request, x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID")) -> Generator:
-    """Ouvre la base du tenant signé dans le JWT; header legacy en développement seulement."""
+def get_db(request: Request) -> Generator:
+    """Ouvre uniquement la base signée dans le jeton. Aucun en-tête ne choisit l'entreprise."""
     tenant_id = _get_verified_tenant_id(request)
-    if tenant_id:
-        # Le registre central est la source de vérité pour statut et existence du tenant.
-        from app.models.tenant_registry import CompanyRegistryORM
-        central = CentralSessionLocal()
-        try:
-            company = central.query(CompanyRegistryORM).filter_by(tenant_id=tenant_id).first()
-            if not company or company.status != "active":
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Environnement d'entreprise inactif ou inconnu.")
-        finally:
-            central.close()
-        from app.core.tenant_db import get_tenant_sessionmaker
-        db = get_tenant_sessionmaker(tenant_id)()
-    elif x_tenant_id and os.getenv("APP_ENV", "development").lower() != "production":
-        # Compatibilité tests/développement; jamais autorisée en production.
-        from app.core.tenant_db import get_tenant_sessionmaker
-        db = get_tenant_sessionmaker(x_tenant_id.strip(), allow_unregistered=True)()
-    else:
+    if not tenant_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentification requise pour sélectionner la base de l'entreprise.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    from app.models.tenant_registry import CompanyRegistryORM
+    central = CentralSessionLocal()
+    try:
+        company = central.query(CompanyRegistryORM).filter_by(tenant_id=tenant_id).first()
+        if not company or company.status != "active":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Environnement d'entreprise inactif ou inconnu.")
+    finally:
+        central.close()
+    from app.core.tenant_db import get_tenant_sessionmaker
+    db = get_tenant_sessionmaker(tenant_id)()
     try:
         yield db
     finally:

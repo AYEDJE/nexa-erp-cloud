@@ -272,7 +272,6 @@ def login_for_access_token(
 def verify_2fa_login(
     req_body: TwoFactorVerifyRequest,
     request: Request,
-    db: Session = Depends(get_db),
 ):
     if not req_body.temp_token:
         raise HTTPException(
@@ -286,9 +285,25 @@ def verify_2fa_login(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Jeton temporaire invalide pour cette étape.",
         )
+    tenant_id = payload.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Entreprise absente du jeton temporaire.",
+        )
 
+    from app.core.tenant_db import get_tenant_sessionmaker
+    db = get_tenant_sessionmaker(tenant_id)()
+    try:
+        return _complete_2fa_login(req_body, request, db, payload)
+    finally:
+        db.close()
+
+
+def _complete_2fa_login(req_body, request, db, payload):
     user = db.query(UserORM).filter(
-        UserORM.email == payload.get("sub")
+        UserORM.email == payload.get("sub"),
+        UserORM.tenant_id == payload.get("tenant_id"),
     ).first()
 
     if not user or not user.is_two_factor_enabled:

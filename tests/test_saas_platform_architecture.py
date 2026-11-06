@@ -88,6 +88,12 @@ def test_business_data_stays_inside_the_company_database():
     right_products = client.get("/products/", headers={"Authorization": f"Bearer {right_token}"})
     assert right_products.status_code == 200
     assert right_products.json() == []
+
+    spoofed = client.get("/products/", headers={"X-Tenant-ID": left})
+    assert spoofed.status_code == 401
+    spoofed_with_token = client.get("/products/", headers={"Authorization": f"Bearer {right_token}", "X-Tenant-ID": left})
+    assert spoofed_with_token.status_code == 200
+    assert spoofed_with_token.json() == []
     left_products = client.get("/products/", headers={"Authorization": f"Bearer {left_token}"})
     assert [item["name"] for item in left_products.json()] == ["Pièce Alpha"]
 
