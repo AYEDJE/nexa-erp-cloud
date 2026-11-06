@@ -205,8 +205,23 @@ def test_products_and_invoices_flow():
     assert pdf_res.headers["content-type"] == "application/pdf"
 
 
+def _company_headers(tenant_id: str) -> dict:
+    """Ouvre une session réelle : le routage vient du jeton, pas d'un en-tête libre."""
+    email = f"{tenant_id}_{__import__('uuid').uuid4().hex[:6]}@example.com"
+    password = "StrongPassword123!"
+    registered = client.post("/auth/register", json={
+        "tenant_id": tenant_id,
+        "email": email,
+        "password": password,
+        "user_type": "admin",
+    })
+    assert registered.status_code == 201, registered.text
+    token = client.post("/auth/login", data={"username": email, "password": password}).json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_transversal_docx_document_generation():
-    headers = {"X-Tenant-ID": "tenant_docs"}
+    headers = _company_headers("tenant_docs")
     payload = {
         "doc_type": "QUOTE",
         "title": "DEVIS COMMERCIAL — PRESTATION CLOUD",
@@ -244,7 +259,7 @@ def test_transversal_docx_document_generation():
 
 
 def test_smart_text_assistance_and_multi_currency():
-    headers = {"X-Tenant-ID": "tenant_docs"}
+    headers = _company_headers("tenant_docs")
 
     # 1. Validation intelligente de formulaire
     form_res = client.post("/documents/assist-input", json={
@@ -270,7 +285,7 @@ def test_smart_text_assistance_and_multi_currency():
 
 
 def test_smart_ocr_and_data_extraction():
-    headers = {"X-Tenant-ID": "tenant_ocr"}
+    headers = _company_headers("tenant_ocr")
     raw_sample = """
     FACTURE N° FAC-2026-789
     Date: 21/10/2026

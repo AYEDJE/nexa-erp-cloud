@@ -141,7 +141,12 @@ def create_tenant_user(
     db.add(user)
     db.commit()
     db.refresh(user)
-    _sync_routing(tenant_id, email, True)
+    try:
+        _sync_routing(tenant_id, email, True)
+    except Exception as exc:
+        db.delete(user)
+        db.commit()
+        raise HTTPException(status_code=500, detail="Impossible d'enregistrer le routage de cet utilisateur.") from exc
     return _to_response(user, _role_names(db, tenant_id))
 
 

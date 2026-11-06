@@ -15,6 +15,7 @@ from app.core.rbac import RoleChecker
 from app.core.middleware import SecurityHeadersMiddleware
 import app.models.tenant_registry  # noqa: F401
 from app.routers import saas_auth, saas_platform
+from app.services.saas_platform_service import ensure_platform_defaults
 
 # Import all ERP models so their metadata is available to tenant provisioning.
 from app.models.user import UserORM
@@ -27,8 +28,6 @@ from app.models.company import CompanyORM
 import app.models.audit
 
 ensure_central_schema()
-from app.services.saas_platform_service import ensure_platform_defaults
-
 ensure_platform_defaults()
 
 app = FastAPI(
