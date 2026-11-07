@@ -12,6 +12,7 @@ from app.models.rbac import RoleORM
 from app.models.tenant_registry import TenantUserRegistryORM
 from app.models.user import UserORM
 from app.schemas.user import UserResponse, UserUpdate
+from app.services.audit_service import log_action
 from app.services.tenant_provisioning import initialize_tenant_base_data
 
 router = APIRouter(prefix="/users", tags=["Users Management"])
@@ -104,6 +105,7 @@ def list_tenant_users(
 def create_tenant_user(
     data: UserCreateByAdmin,
     tenant_id: str = Depends(get_current_tenant_id),
+    current_user: dict = Depends(allow_admin_only),
     db: Session = Depends(get_db),
 ):
     """Crée un utilisateur dans l'entreprise de l'admin connecté."""
@@ -148,6 +150,7 @@ def create_tenant_user(
         db.delete(user)
         db.commit()
         raise HTTPException(status_code=500, detail="Impossible d'enregistrer le routage de cet utilisateur.") from exc
+    log_action(db, tenant_id, "USER_CREATE", f"user:{user.email}", current_user.get("user_id"), {"role": data.role, "user_type": user_type})
     return _to_response(user, _role_names(db, tenant_id))
 
 
@@ -200,4 +203,5 @@ def update_user(
     db.commit()
     db.refresh(user)
     _sync_routing(tenant_id, user.email, bool(user.is_active), previous_email=previous_email)
+    log_action(db, tenant_id, "USER_UPDATE", f"user:{user.email}", current_user.get("user_id"), {"previous_email": previous_email, "is_active": user.is_active, "user_type": str(user.user_type)})
     return _to_response(user, _role_names(db, tenant_id))

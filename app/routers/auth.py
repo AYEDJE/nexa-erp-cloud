@@ -239,19 +239,8 @@ def login_for_access_token(
     payload_base["jti"] = jti
     access_token = create_access_token(payload_base)
 
-    db.add(
-        UserSessionORM(
-            tenant_id=user.tenant_id,
-            user_id=user.id,
-            session_token=jti,
-            device_id=device_fp,
-            ip_address=client_ip,
-            user_agent=user_agent,
-            os=ua_info["os"],
-            browser=ua_info["browser"],
-            expires_at=refresh_exp,
-        )
-    )
+    from app.services.session_guard import start_unique_session
+    start_unique_session(db, tenant_id=user.tenant_id, user_id=user.id, jti=jti, device_id=device_fp, ip_address=client_ip, user_agent=user_agent, os_name=ua_info["os"], browser=ua_info["browser"], expires_at=refresh_exp)
 
     from app.services.access_trace import dispatch_login_notifications, record_connection
     record_connection(db, user, success=True, ip_address=client_ip, user_agent=user_agent, detail="workspace")
@@ -353,19 +342,8 @@ def _complete_2fa_login(req_body, request, db, payload):
     payload_base["jti"] = jti
     access_token = create_access_token(payload_base)
 
-    db.add(
-        UserSessionORM(
-            tenant_id=user.tenant_id,
-            user_id=user.id,
-            session_token=jti,
-            device_id=device_fp,
-            ip_address=client_ip,
-            user_agent=user_agent,
-            os=ua_info["os"],
-            browser=ua_info["browser"],
-            expires_at=refresh_exp,
-        )
-    )
+    from app.services.session_guard import start_unique_session
+    start_unique_session(db, tenant_id=user.tenant_id, user_id=user.id, jti=jti, device_id=device_fp, ip_address=client_ip, user_agent=user_agent, os_name=ua_info["os"], browser=ua_info["browser"], expires_at=refresh_exp)
 
     from app.services.access_trace import dispatch_login_notifications, record_connection
     record_connection(db, user, success=True, ip_address=client_ip, user_agent=user_agent, detail="2fa")
@@ -474,7 +452,29 @@ def disable_two_factor(
     }
 
 
-# --- 5. RENOUVELLEMENT DE JETON ET DÉCONNEXION ---
+# --- 5. SESSION UNIQUE, RENOUVELLEMENT ET DÉCONNEXION ---
+
+@router.get("/session")
+def read_current_session(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.services.session_guard import idle_minutes
+    jti = current_user.get("jti")
+    session = db.query(UserSessionORM).filter(UserSessionORM.session_token == jti).first() if jti else None
+    open_sessions = db.query(UserSessionORM).filter(
+        UserSessionORM.user_id == current_user.get("user_id"),
+        UserSessionORM.tenant_id == current_user.get("tenant_id"),
+        UserSessionORM.is_revoked == False,
+    ).count()
+    return {
+        "active": bool(session and not session.is_revoked),
+        "open_sessions": open_sessions,
+        "idle_minutes": idle_minutes(),
+        "ip_address": session.ip_address if session else None,
+        "started_at": session.created_at.isoformat() if session and session.created_at else None,
+        "last_active_at": session.last_active_at.isoformat() if session and session.last_active_at else None,
+    }
+
+
+# --- 5b. RENOUVELLEMENT DE JETON ET DÉCONNEXION ---
 
 @router.post("/refresh", response_model=Token)
 def refresh_access_token(
@@ -490,18 +490,8 @@ def refresh_access_token(
         )
 
     jti = payload.get("jti")
-    session = db.query(UserSessionORM).filter(
-        UserSessionORM.session_token == jti,
-        UserSessionORM.is_revoked == False,
-    ).first()
-
-    if not session or session.expires_at < datetime.utcnow():
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expirée ou révoquée. Veuillez vous reconnecter.",
-        )
-
-    session.last_active_at = datetime.utcnow()
+    from app.services.session_guard import assert_active_session
+    assert_active_session(payload)
 
     new_access_token = create_access_token({
         "sub": payload["sub"],
@@ -510,8 +500,6 @@ def refresh_access_token(
         "user_id": payload["user_id"],
         "jti": jti,
     })
-
-    db.commit()
 
     return {
         "access_token": new_access_token,

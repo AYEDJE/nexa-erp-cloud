@@ -31,6 +31,26 @@ def record_connection(db: Session, user: UserORM, *, success: bool, ip_address: 
         user_agent=(user_agent or "")[:240] or None,
         detail=(detail or "")[:240] or None,
     ))
+    if not success:
+        from app.models.activity import AccessLogORM as AccessLog
+        from app.models.security import SecurityAlertORM
+        from datetime import timedelta
+        since = now - timedelta(minutes=15)
+        failures = db.query(AccessLog).filter(
+            AccessLog.tenant_id == user.tenant_id,
+            AccessLog.user_id == user.id,
+            AccessLog.event_type == "login_failure",
+            AccessLog.occurred_at >= since,
+        ).count()
+        if failures + 1 >= 3:
+            db.add(SecurityAlertORM(
+                tenant_id=user.tenant_id,
+                user_id=user.id,
+                alert_type="brute_force",
+                severity="high",
+                ip_address=(ip_address or "")[:64] or None,
+                details="Plusieurs connexions refusées sur une courte période.",
+            ))
 
 
 def record_activity(db: Session, user: UserORM, *, method: str, resource: str, ip_address: str = None) -> None:

@@ -53,19 +53,47 @@
     }
   }
 
+  function fermerSession(message) {
+    sessionStorage.setItem('login_notice', message || 'Votre session est fermée. Reconnectez-vous.');
+    ['access_token', 'refresh_token', 'current_user'].forEach((key) => {
+      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
+    });
+    window.location.href = 'index.html';
+  }
+
+  let idleMinutes = 30;
+  let lastActivity = Date.now();
+  ['click', 'keydown', 'mousemove'].forEach((eventName) => {
+    document.addEventListener(eventName, () => { lastActivity = Date.now(); }, { passive: true });
+  });
+
   async function verifier() {
+    if (Date.now() - lastActivity > idleMinutes * 60 * 1000) {
+      fermerSession(`Session fermée après ${idleMinutes} minutes d'inactivité. Reconnectez-vous.`);
+      return;
+    }
     if (tokenEstExpire(token)) {
       const ok = await rafraichirToken();
       if (!ok) {
-        // Déconnexion propre : on ne supprime QUE la session, pas la base des entreprises
-        ['access_token', 'refresh_token', 'current_user'].forEach((key) => {
-          sessionStorage.removeItem(key);
-          localStorage.removeItem(key);
-        });
-        window.location.href = 'index.html';
+        fermerSession('Session expirée. Reconnectez-vous.');
+        return;
       }
     }
+    try {
+      const res = await fetch(`${API}/auth/session`, { headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token') || token}` } });
+      if (res.status === 401) {
+        const data = await res.json().catch(() => ({}));
+        fermerSession(typeof data.detail === 'string' ? data.detail : 'Cette session a été fermée.');
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.idle_minutes) idleMinutes = data.idle_minutes;
+      }
+    } catch (error) {}
   }
 
   verifier();
+  setInterval(verifier, 60000);
 })();

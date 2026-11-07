@@ -14,6 +14,7 @@ from app.core.database import ensure_central_schema
 from app.core.rbac import RoleChecker
 from app.core.middleware import SecurityHeadersMiddleware
 from app.core.activity_middleware import ActivityTraceMiddleware
+from app.core.permission_middleware import ModulePermissionMiddleware
 import app.models.tenant_registry  # noqa: F401
 from app.routers import saas_auth, saas_platform
 from app.services.saas_platform_service import ensure_platform_defaults
@@ -41,6 +42,7 @@ app = FastAPI(
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ActivityTraceMiddleware)
+app.add_middleware(ModulePermissionMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

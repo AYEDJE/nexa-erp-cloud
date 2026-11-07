@@ -77,6 +77,7 @@ def test_login_history_activity_and_notifications_stay_inside_the_company():
 
     again = client.post("/auth/login", data={"username": email, "password": "password123"})
     assert again.status_code == 200
+    owner = {"Authorization": f"Bearer {again.json()['access_token']}"}
     latest = {}
     for row in client.get("/security/notifications", headers=owner).json():
         latest.setdefault(row["channel"], row)

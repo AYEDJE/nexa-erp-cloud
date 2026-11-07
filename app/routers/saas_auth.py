@@ -163,7 +163,8 @@ def login_for_access_token(
         user.locked_until = None
         refresh_token, jti, refresh_exp = create_refresh_token({"sub": user.email, "tenant_id": tenant_id, "user_type": user_type, "user_id": user.id})
         access_token = create_access_token({"sub": user.email, "tenant_id": tenant_id, "user_type": user_type, "user_id": user.id, "jti": jti})
-        tenant_db.add(UserSessionORM(tenant_id=tenant_id, user_id=user.id, session_token=jti, device_id=device_fp, ip_address=client_ip, user_agent=user_agent, os=ua["os"], browser=ua["browser"], expires_at=refresh_exp))
+        from app.services.session_guard import start_unique_session
+        start_unique_session(tenant_db, tenant_id=tenant_id, user_id=user.id, jti=jti, device_id=device_fp, ip_address=client_ip, user_agent=user_agent, os_name=ua["os"], browser=ua["browser"], expires_at=refresh_exp)
         from app.services.access_trace import dispatch_login_notifications, record_connection
         record_connection(tenant_db, user, success=True, ip_address=client_ip, user_agent=user_agent, detail="workspace")
         tenant_db.commit()

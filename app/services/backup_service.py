@@ -1,3 +1,4 @@
+import hashlib
 import json
 from datetime import datetime
 from typing import Any, Dict
@@ -10,7 +11,16 @@ from app.models.user import UserORM
 from app.models.audit import AuditLogORM
 
 
-def create_tenant_backup_snapshot(tenant_id: str, db: Session) -> Dict[str, Any]:
+def snapshot_checksum(snapshot: Dict[str, Any]) -> str:
+    clone = dict(snapshot)
+    metadata = dict(clone.get("metadata") or {})
+    metadata.pop("checksum", None)
+    clone["metadata"] = metadata
+    raw = json.dumps(clone, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def create_tenant_backup_snapshot(tenant_id: str, db: Session, user_id: int = None) -> Dict[str, Any]:
     """
     Crée une sauvegarde complète et isolée des données d'un tenant (JSON snapshot).
     """
@@ -25,7 +35,7 @@ def create_tenant_backup_snapshot(tenant_id: str, db: Session) -> Dict[str, Any]
             "version": "2.0.0",
             "tenant_id": tenant_id,
             "created_at": datetime.utcnow().isoformat(),
-            "checksum": f"sha256_{__import__('uuid').uuid4().hex}"
+            "passwords_included": False,
         },
         "products": [
             {
@@ -66,18 +76,21 @@ def create_tenant_backup_snapshot(tenant_id: str, db: Session) -> Dict[str, Any]
         "users": [
             {
                 "email": u.email,
-                "user_type": u.user_type,
-                "is_active": u.is_active
+                "full_name": u.full_name,
+                "user_type": str(getattr(u.user_type, "value", u.user_type)),
+                "is_active": u.is_active,
             } for u in users
         ]
     }
+    snapshot["metadata"]["checksum"] = snapshot_checksum(snapshot)
 
     # Journalisation de l'opération critique dans l'audit
     audit = AuditLogORM(
         tenant_id=tenant_id,
+        user_id=user_id,
         action="BACKUP_EXPORT",
         resource="TENANT_DATABASE",
-        details={"total_products": len(products), "total_invoices": len(invoices)}
+        details={"total_products": len(products), "total_invoices": len(invoices), "checksum": snapshot["metadata"]["checksum"]}
     )
     db.add(audit)
     db.commit()
@@ -85,14 +98,18 @@ def create_tenant_backup_snapshot(tenant_id: str, db: Session) -> Dict[str, Any]
     return snapshot
 
 
-def restore_tenant_from_snapshot(snapshot: Dict[str, Any], target_tenant_id: str, db: Session) -> Dict[str, Any]:
+def restore_tenant_from_snapshot(snapshot: Dict[str, Any], target_tenant_id: str, db: Session, user_id: int = None) -> Dict[str, Any]:
     """
     Restaure les données à partir d'un snapshot avec validation stricte de cohérence.
     """
-    meta = snapshot.get("metadata", {})
+    meta = snapshot.get("metadata") or {}
     source_tenant = meta.get("tenant_id")
     if not source_tenant:
         raise ValueError("Snapshot invalide : métadonnées manquantes.")
+    if meta.get("checksum") != snapshot_checksum(snapshot):
+        raise ValueError("Intégrité refusée : l'empreinte de la sauvegarde ne correspond pas.")
+    if source_tenant != target_tenant_id:
+        raise ValueError("Cette sauvegarde appartient à une autre entreprise et ne peut pas être restaurée ici.")
 
     restored_counts = {
         "products": 0,
@@ -135,6 +152,7 @@ def restore_tenant_from_snapshot(snapshot: Dict[str, Any], target_tenant_id: str
     # Journalisation
     audit = AuditLogORM(
         tenant_id=target_tenant_id,
+        user_id=user_id,
         action="BACKUP_RESTORE",
         resource="TENANT_DATABASE",
         details=restored_counts

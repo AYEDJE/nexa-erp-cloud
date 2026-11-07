@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA ERP — Sessions et sauvegardes</title>
+  <script src="js/guard.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .table-container, .card { background:#fff; border-radius:8px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,.05); margin-top:10px; }
+    .data-table { width:100%; border-collapse:collapse; }
+    .data-table th, .data-table td { padding:12px 14px; border-bottom:1px solid #e5e7eb; font-size:13px; text-align:left; }
+    .data-table th { background:#f9fafb; color:#4b5563; }
+    .btn-primary { background:#1a73e8; color:#fff; border:none; padding:9px 16px; border-radius:6px; cursor:pointer; font-weight:600; }
+    .hint { color:#64748b; font-size:13px; margin:0 0 12px; }
+    .tabs { display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; }
+    .tab { border:1px solid #cbd5e1; background:#fff; border-radius:999px; padding:8px 14px; cursor:pointer; font-weight:600; font-size:13px; }
+    .tab.active { background:#1a73e8; color:#fff; border-color:#1a73e8; }
+    .kpi-section { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .kpi-card { background:#fff; border-radius:8px; padding:16px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><h2>NEXA <span>ERP</span></h2><small>Votre gestion, notre solution</small></div>
+      <nav class="sidebar-nav">
+        <ul>
+          <li><a href="dashboard.html"><i class="fa-solid fa-house"></i> <span>Tableau de bord</span></a></li>
+          <li><a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Ventes & Factures</span></a></li>
+          <li><a href="produit.html"><i class="fa-solid fa-box-open"></i> <span>Produits & Articles</span></a></li>
+          <li><a href="achats.html"><i class="fa-solid fa-cart-shopping"></i> <span>Achats</span></a></li>
+          <li><a href="tresorerie.html"><i class="fa-solid fa-coins"></i> <span>Paiements & Trésorerie</span></a></li>
+          <li><a href="clients.html"><i class="fa-solid fa-users"></i> <span>Clients</span></a></li>
+          <li><a href="stock.html"><i class="fa-solid fa-warehouse"></i> <span>Stock & Entrepôts</span></a></li>
+          <li><a href="securite.html"><i class="fa-solid fa-shield-halved"></i> <span>Traçabilité & Alertes</span></a></li>
+          <li class="active"><a href="gouvernance.html"><i class="fa-solid fa-user-lock"></i> <span>Sessions & Sauvegardes</span></a></li>
+        </ul>
+        <p class="nav-section-title">PARAMÈTRES</p>
+        <ul>
+          <li><a href="societe.html"><i class="fa-solid fa-building"></i> <span>Société</span></a></li>
+          <li><a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span>Utilisateurs & Rôles</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <button type="button">☰</button>
+        <h3>Sessions & Sauvegardes</h3>
+        <div class="topbar-right"><button id="btn-logout" type="button">Déconnexion</button></div>
+      </header>
+      <main class="content">
+        <p class="hint" id="company-context"></p>
+        <section class="kpi-section">
+          <div class="kpi-card"><p>Sessions ouvertes</p><h2 id="kpi-sessions">0</h2></div>
+          <div class="kpi-card"><p>Inactivité maximale</p><h2 id="kpi-idle">30 min</h2></div>
+          <div class="kpi-card"><p>Alertes</p><h2 id="kpi-alerts">0</h2></div>
+        </section>
+        <div class="tabs">
+          <button class="tab active" type="button" data-tab="session">Session</button>
+          <button class="tab" type="button" data-tab="journal">Journal</button>
+          <button class="tab" type="button" data-tab="backup">Sauvegarde</button>
+        </div>
+        <section class="table-container" id="panel-session">
+          <p class="hint" id="session-text"></p>
+          <table class="data-table">
+            <thead><tr><th>Type</th><th>Gravité</th><th>Adresse IP</th><th>Détail</th><th>Date</th></tr></thead>
+            <tbody id="alerts-body"></tbody>
+          </table>
+        </section>
+        <section class="table-container" id="panel-journal" hidden>
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Heure</th><th>Utilisateur</th><th>Opération</th><th>Donnée</th></tr></thead>
+            <tbody id="journal-body"></tbody>
+          </table>
+        </section>
+        <section class="card" id="panel-backup" hidden>
+          <p class="hint">La sauvegarde ne contient que cette entreprise. Elle porte une empreinte SHA-256. Une sauvegarde modifiée ou provenant d'une autre entreprise est refusée. Les mots de passe ne sont pas inclus.</p>
+          <button class="btn-primary" id="export-backup" type="button">Télécharger la sauvegarde</button>
+          <div class="form-group" style="margin-top:16px;">
+            <label for="restore-file">Restaurer un fichier de cette entreprise</label>
+            <input id="restore-file" type="file" accept="application/json">
+          </div>
+          <p id="backup-message" class="hint"></p>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/gouvernance.js"></script>
+</body>
+</html>

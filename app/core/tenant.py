@@ -17,6 +17,8 @@ def get_tenant_id(token: str = Depends(oauth2_scheme)) -> str:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Jeton invalide ou expiré.") from exc
+    from app.services.session_guard import assert_active_session
+    assert_active_session(payload)
     tenant_id = payload.get("tenant_id")
     if not tenant_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Tenant absent du jeton.")

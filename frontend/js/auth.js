@@ -266,6 +266,13 @@ async function logout() {
 const loginForm = document.getElementById('login-form');
 
 if (loginForm) {
+  const notice = sessionStorage.getItem('login_notice');
+  const errorMsgBox = document.getElementById('error-msg');
+  if (notice && errorMsgBox) {
+    errorMsgBox.textContent = notice;
+    errorMsgBox.style.display = 'block';
+    sessionStorage.removeItem('login_notice');
+  }
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 

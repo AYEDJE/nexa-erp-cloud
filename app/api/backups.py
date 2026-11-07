@@ -23,12 +23,13 @@ class RestoreRequest(BaseModel):
 @router.post("/export", dependencies=[Depends(allow_admin_only)])
 def export_backup(
     tenant_id: str = Depends(get_current_tenant_id),
+    current_user: dict = Depends(allow_admin_only),
     db: Session = Depends(get_db)
 ):
     """
     Exporte une sauvegarde complète des données du tenant (JSON snapshot chiffrable).
     """
-    snapshot = create_tenant_backup_snapshot(tenant_id=tenant_id, db=db)
+    snapshot = create_tenant_backup_snapshot(tenant_id=tenant_id, db=db, user_id=current_user.get("user_id"))
     return snapshot
 
 
@@ -36,6 +37,7 @@ def export_backup(
 def restore_backup(
     request: RestoreRequest,
     tenant_id: str = Depends(get_current_tenant_id),
+    current_user: dict = Depends(allow_admin_only),
     db: Session = Depends(get_db)
 ):
     """
@@ -45,7 +47,8 @@ def restore_backup(
         result = restore_tenant_from_snapshot(
             snapshot=request.snapshot,
             target_tenant_id=tenant_id,
-            db=db
+            db=db,
+            user_id=current_user.get("user_id"),
         )
         return result
     except Exception as e:

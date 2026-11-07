@@ -25,7 +25,13 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
+        if payload.get("token_type") not in (None, "access"):
+            raise credentials_exception
+        from app.services.session_guard import assert_active_session
+        assert_active_session(payload)
         return payload
+    except HTTPException:
+        raise
     except (JWTError, Exception):
         raise credentials_exception
 
