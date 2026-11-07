@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA ERP — Stock & Entrepôts</title>
+  <script src="js/guard.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .table-container { background:#fff; border-radius:8px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,.05); margin-top:10px; }
+    .data-table { width:100%; border-collapse:collapse; text-align:left; }
+    .data-table th, .data-table td { padding:12px 14px; border-bottom:1px solid #e5e7eb; font-size:13px; }
+    .data-table th { background:#f9fafb; color:#4b5563; }
+    .btn-primary { background:#1a73e8; color:#fff; border:none; padding:9px 16px; border-radius:6px; cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:6px; font-size:13px; }
+    .quick-nav-btn { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; }
+    .tabs { display:flex; gap:8px; margin:8px 0 4px; }
+    .tab { border:1px solid #cbd5e1; background:#fff; border-radius:999px; padding:8px 14px; cursor:pointer; font-weight:600; font-size:13px; }
+    .tab.active { background:#1a73e8; color:#fff; border-color:#1a73e8; }
+    .pill { padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; }
+    .ok { background:#dcfce7; color:#166534; }
+    .low { background:#fef3c7; color:#b45309; }
+    .empty { background:#fee2e2; color:#991b1b; }
+    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; overflow-y:auto; }
+    .modal-content { background:#fff; margin:4% auto; padding:25px 30px; border-radius:10px; width:min(560px,94%); position:relative; }
+    .close-btn { position:absolute; right:18px; top:12px; font-size:24px; cursor:pointer; color:#6b7280; }
+    .form-group { margin-bottom:14px; display:flex; flex-direction:column; }
+    .form-group label { margin-bottom:5px; font-weight:600; font-size:13px; }
+    .form-group input, .form-group select { padding:9px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .hint { color:#64748b; font-size:13px; margin:0 0 12px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><h2>NEXA <span>ERP</span></h2><small>Votre gestion, notre solution</small></div>
+      <nav class="sidebar-nav">
+        <ul>
+          <li><a href="dashboard.html"><i class="fa-solid fa-house"></i> <span>Tableau de bord</span></a></li>
+          <li><a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Ventes & Factures</span></a></li>
+          <li><a href="produit.html"><i class="fa-solid fa-box-open"></i> <span>Produits & Articles</span></a></li>
+          <li><a href="achats.html"><i class="fa-solid fa-cart-shopping"></i> <span>Achats</span></a></li>
+          <li><a href="tresorerie.html"><i class="fa-solid fa-coins"></i> <span>Paiements & Trésorerie</span></a></li>
+          <li><a href="clients.html"><i class="fa-solid fa-users"></i> <span>Clients</span></a></li>
+          <li class="active"><a href="stock.html"><i class="fa-solid fa-warehouse"></i> <span>Stock & Entrepôts</span></a></li>
+        </ul>
+        <p class="nav-section-title">PARAMÈTRES</p>
+        <ul>
+          <li><a href="societe.html"><i class="fa-solid fa-building"></i> <span>Société</span></a></li>
+          <li><a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span>Utilisateurs & Rôles</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <button type="button">☰</button>
+        <h3>Stock & Entrepôts</h3>
+        <div class="topbar-right">
+          <a class="quick-nav-btn" href="dashboard.html"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>
+          <a class="quick-nav-btn" href="produit.html"><i class="fa-solid fa-box-open"></i> Produits</a>
+          <a class="quick-nav-btn" href="achats.html"><i class="fa-solid fa-cart-shopping"></i> Achats</a>
+          <button id="open-warehouse" class="btn-primary" type="button"><i class="fa-solid fa-warehouse"></i> Entrepôt</button>
+          <button id="open-movement" class="btn-primary" type="button"><i class="fa-solid fa-right-left"></i> Mouvement</button>
+          <button id="open-transfer" class="btn-primary" type="button"><i class="fa-solid fa-truck"></i> Transfert</button>
+          <button id="btn-logout" type="button">Déconnexion</button>
+        </div>
+      </header>
+      <main class="content">
+        <p class="hint" id="company-context"></p>
+        <section class="kpi-section" style="grid-template-columns:repeat(4,1fr);">
+          <div class="kpi-card"><p>Entrepôts</p><h2 id="kpi-warehouses">0</h2></div>
+          <div class="kpi-card"><p>Références en stock</p><h2 id="kpi-items">0</h2></div>
+          <div class="kpi-card"><p>Unités disponibles</p><h2 id="kpi-units">0</h2></div>
+          <div class="kpi-card"><p>Ruptures ou stock bas</p><h2 id="kpi-low">0</h2></div>
+        </section>
+        <div class="tabs">
+          <button class="tab active" type="button" data-tab="stock">Stock</button>
+          <button class="tab" type="button" data-tab="warehouses">Entrepôts</button>
+          <button class="tab" type="button" data-tab="movements">Mouvements</button>
+        </div>
+        <section class="table-container" id="panel-stock">
+          <table class="data-table">
+            <thead><tr><th>Article</th><th>Entrepôt</th><th>Entrées</th><th>Sorties</th><th>Disponible</th></tr></thead>
+            <tbody id="stock-body"></tbody>
+          </table>
+        </section>
+        <section class="table-container" id="panel-warehouses" hidden>
+          <table class="data-table">
+            <thead><tr><th>Nom</th><th>Code</th><th>Emplacement</th></tr></thead>
+            <tbody id="warehouses-body"></tbody>
+          </table>
+        </section>
+        <section class="table-container" id="panel-movements" hidden>
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Entrepôt</th><th>Article</th><th>Type</th><th>Quantité</th><th>Référence</th></tr></thead>
+            <tbody id="movements-body"></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal" id="warehouse-modal">
+    <div class="modal-content">
+      <span class="close-btn" data-close="warehouse-modal">&times;</span>
+      <h3 style="margin-top:0;">Nouvel entrepôt</h3>
+      <form id="warehouse-form">
+        <div class="form-group"><label for="wh-name">Nom</label><input id="wh-name" required></div>
+        <div class="form-row">
+          <div class="form-group"><label for="wh-code">Code</label><input id="wh-code" required placeholder="MAG1"></div>
+          <div class="form-group"><label for="wh-location">Emplacement</label><input id="wh-location" placeholder="Lomé, zone portuaire"></div>
+        </div>
+        <button class="btn-primary" type="submit">Enregistrer</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="movement-modal">
+    <div class="modal-content">
+      <span class="close-btn" data-close="movement-modal">&times;</span>
+      <h3 style="margin-top:0;">Mouvement de stock</h3>
+      <form id="movement-form">
+        <div class="form-group"><label for="mv-warehouse">Entrepôt</label><select id="mv-warehouse" required></select></div>
+        <div class="form-group"><label for="mv-product">Article</label><select id="mv-product"></select></div>
+        <div class="form-group"><label for="mv-name">Nom si saisie libre</label><input id="mv-name"></div>
+        <div class="form-row">
+          <div class="form-group"><label for="mv-type">Type</label>
+            <select id="mv-type"><option value="in">Entrée</option><option value="out">Sortie</option></select>
+          </div>
+          <div class="form-group"><label for="mv-qty">Quantité</label><input id="mv-qty" type="number" min="0.01" step="0.01" value="1" required></div>
+        </div>
+        <div class="form-group"><label for="mv-notes">Note</label><input id="mv-notes"></div>
+        <button class="btn-primary" type="submit">Enregistrer le mouvement</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="transfer-modal">
+    <div class="modal-content">
+      <span class="close-btn" data-close="transfer-modal">&times;</span>
+      <h3 style="margin-top:0;">Transfert entre entrepôts</h3>
+      <form id="transfer-form">
+        <div class="form-row">
+          <div class="form-group"><label for="tr-from">Depuis</label><select id="tr-from" required></select></div>
+          <div class="form-group"><label for="tr-to">Vers</label><select id="tr-to" required></select></div>
+        </div>
+        <div class="form-group"><label for="tr-product">Article</label><select id="tr-product"></select></div>
+        <div class="form-group"><label for="tr-name">Nom si saisie libre</label><input id="tr-name"></div>
+        <div class="form-group"><label for="tr-qty">Quantité</label><input id="tr-qty" type="number" min="0.01" step="0.01" value="1" required></div>
+        <button class="btn-primary" type="submit">Transférer</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/stock.js"></script>
+</body>
+</html>
