@@ -1,7 +1,7 @@
 const API = window.API || 'http://127.0.0.1:8000';
 
 document.addEventListener("DOMContentLoaded", () => {
-    const token = sessionStorage.getItem("access_token") || localStorage.getItem("access_token");
+    const token = sessionStorage.getItem("access_token");
     if (!token) {
         window.location.href = "index.html";
         return;
@@ -22,6 +22,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const isDemo = !token || token.startsWith("demo_");
     let currentInvoices = [];
+    const companyContext = document.getElementById("company-context");
+    if (companyContext && window.NexaTenant) {
+        const sessionUser = window.NexaTenant.getCurrentUser();
+        const companyName = sessionUser.company_name || sessionUser.tenant_id || "cette entreprise";
+        companyContext.textContent = `Factures de ${companyName} uniquement. Une autre entreprise ne les reçoit pas.`;
+    }
 
     const DOC_LABELS = {
         INVOICE: "Facture",
@@ -224,10 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderTable(invoices);
             updateKPIs(invoices);
         } catch (error) {
-            console.warn("Backend indisponible, utilisation du registre isolé local :", error);
-            const list = getTenantInvoices();
-            renderTable(list);
-            updateKPIs(list);
+            tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 28px; color:#991b1b;">${escapeHtml(error.message || "Impossible de charger les factures de cette entreprise.")}</td></tr>`;
         }
     }
 
@@ -851,32 +854,7 @@ document.addEventListener("DOMContentLoaded", () => {
             fetchInvoices();
             alert(`✅ Document N° ${created.number} créé avec succès !`);
         } catch (error) {
-            console.warn("Échec d'envoi API, enregistrement dans l'espace isolé local :", error);
-            // Repli automatique sur le stockage isolé
-            const list = getTenantInvoices();
-            const newId = list.length > 0 ? Math.max(...list.map(i => i.id || 0)) + 1 : 1;
-            const newInv = {
-                id: newId,
-                number: `FAC-${new Date().toISOString().slice(0, 7).replace("-", "")}-${newId.toString().padStart(3, "0")}`,
-                doc_type: docType,
-                customer_name: customerName,
-                customer_email: customerEmail,
-                customer_phone: customerPhone,
-                customer_address: customerAddress,
-                issuer: issuer,
-                items: [{ product_name: itemName, quantity: itemQty, unit_price_ht: itemPrice, tva_rate: itemTva }],
-                total_ht: lineHt,
-                tax_amount: lineTva,
-                total_ttc: lineTtc,
-                status: "pending",
-                language: lang,
-                created_at: new Date().toISOString()
-            };
-            list.unshift(newInv);
-            saveTenantInvoices(list);
-            modal.style.display = "none";
-            fetchInvoices();
-            alert(`✅ Document créé avec succès (sauvegardé dans l'espace isolé entreprise) !`);
+            alert(error.message || "La facture n'a pas été enregistrée.");
         } finally {
             if (submitBtn) submitBtn.disabled = false;
         }

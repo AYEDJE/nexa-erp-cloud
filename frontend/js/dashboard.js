@@ -1,7 +1,7 @@
 const API = window.API || 'http://127.0.0.1:8000';
 
 function getToken() {
-  return sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
+  return sessionStorage.getItem('access_token');
 }
 
 const isDemo = () => {
@@ -50,13 +50,7 @@ async function apiFetch(endpoint) {
     if (!res.ok) throw new Error("API non disponible");
     return await res.json();
   } catch (err) {
-    console.warn(`Erreur de connexion vers ${endpoint}, repli sur les données isolées de l'entreprise :`, err);
-    if (endpoint.startsWith('/products/')) {
-      return window.NexaTenant ? window.NexaTenant.getData('products', []) : [];
-    }
-    if (endpoint.startsWith('/invoices/')) {
-      return window.NexaTenant ? window.NexaTenant.getData('invoices', []) : [];
-    }
+    console.warn(`Erreur de connexion vers ${endpoint}`, err);
     return [];
   }
 }

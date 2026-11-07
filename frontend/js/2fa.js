@@ -37,11 +37,9 @@ if (form) {
       }
 
       sessionStorage.removeItem('temp_token');
-      localStorage.removeItem('temp_token');
+      sessionStorage.removeItem('temp_token');
       sessionStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('access_token', data.access_token);
       sessionStorage.setItem('refresh_token', data.refresh_token);
-      localStorage.setItem('refresh_token', data.refresh_token);
 
       const payload = JSON.parse(atob(data.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
       const profile = JSON.stringify({
@@ -50,7 +48,6 @@ if (form) {
         user_type: payload.user_type || 'admin'
       });
       sessionStorage.setItem('current_user', profile);
-      localStorage.setItem('current_user', profile);
 
       window.location.href = 'dashboard.html';
     } catch (err) {

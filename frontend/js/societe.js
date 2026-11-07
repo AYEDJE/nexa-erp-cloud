@@ -1,7 +1,7 @@
 const API = window.API || 'http://127.0.0.1:8000';
 
 document.addEventListener("DOMContentLoaded", () => {
-    const token = sessionStorage.getItem("access_token") || localStorage.getItem("access_token");
+    const token = sessionStorage.getItem("access_token");
     if (!token) {
         window.location.href = "index.html";
         return;
@@ -95,13 +95,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function loadCompany() {
         // Mode Démo ou Local isolé par entreprise
-        if (isDemo || window.NexaTenant) {
+        if (isDemo) {
             let data = null;
             if (window.NexaTenant) {
                 data = window.NexaTenant.getData("company", null);
-            }
-            if (!data) {
-                try { data = JSON.parse(localStorage.getItem(COMPANY_KEY)) || {}; } catch (_) { data = {}; }
             }
             // Si le profil est vide, pré-remplir avec les informations de l'entreprise connectée
             const u = window.NexaTenant ? window.NexaTenant.getCurrentUser() : null;

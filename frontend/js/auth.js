@@ -1,10 +1,9 @@
 function readSession(key) {
-  return sessionStorage.getItem(key) || localStorage.getItem(key);
+  return sessionStorage.getItem(key);
 }
 
 function writeSession(key, value) {
   sessionStorage.setItem(key, value);
-  localStorage.setItem(key, value);
 }
 
 function removeSession(key) {
@@ -12,18 +11,9 @@ function removeSession(key) {
   localStorage.removeItem(key);
 }
 
-function captureTabSession() {
-  if (sessionStorage.getItem('access_token')) return;
-  const access = localStorage.getItem('access_token');
-  if (!access) return;
-  sessionStorage.setItem('access_token', access);
-  ['refresh_token', 'current_user', 'demo_user'].forEach((key) => {
-    const value = localStorage.getItem(key);
-    if (value) sessionStorage.setItem(key, value);
-  });
-}
-
-captureTabSession();
+['access_token', 'refresh_token', 'current_user', 'demo_user', 'temp_token'].forEach((key) => {
+  localStorage.removeItem(key);
+});
 
 window.API = window.API || (
   window.location.protocol === 'file:' ||
@@ -156,10 +146,6 @@ window.NexaTenant = {
 
   // Détermine le Tenant ID actif
   getTenantId() {
-    const user = this.getCurrentUser();
-    if (user && user.tenant_id) return user.tenant_id;
-
-    // Décodage du jeton JWT si présent
     const token = readSession('access_token');
     if (token && token.includes('.')) {
       try {
@@ -167,6 +153,8 @@ window.NexaTenant = {
         if (payload && payload.tenant_id) return payload.tenant_id;
       } catch (e) {}
     }
+    const user = this.getCurrentUser();
+    if (user && user.tenant_id) return user.tenant_id;
 
     if (user && user.email) {
       const parts = user.email.split('@');

@@ -2,7 +2,7 @@ const API = window.API || 'http://127.0.0.1:8000';
 
 document.addEventListener("DOMContentLoaded", () => {
     function currentToken() {
-        return sessionStorage.getItem("access_token") || localStorage.getItem("access_token");
+        return sessionStorage.getItem("access_token");
     }
     const token = currentToken();
     if (!token) {
