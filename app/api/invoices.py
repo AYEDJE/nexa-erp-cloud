@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -9,6 +10,7 @@ from app.core.tenant import get_tenant_id
 from app.models.invoice import InvoiceItemORM, InvoiceORM, InvoiceStatus
 from app.schemas.invoice import InvoiceCreate, InvoiceResponse
 from app.services.pdf_service import generate_invoice_pdf
+from app.services.treasury_service import collect_invoice
 from app.utils.number_to_words import amount_to_words
 
 router = APIRouter(prefix="/invoices", tags=["Invoices & Documents"])
@@ -143,4 +145,31 @@ def download_invoice_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+class InvoicePaymentIn(BaseModel):
+    method: str = "cash"
+    amount: Optional[float] = Field(default=None, gt=0)
+    paid_at: Optional[str] = None
+    reference: Optional[str] = None
+    account_id: Optional[int] = None
+
+
+@router.post("/{invoice_id}/payments")
+def record_invoice_payment(
+    invoice_id: int,
+    payment: InvoicePaymentIn,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_tenant_id),
+):
+    """Encaissement d'une facture : alimente la caisse ou la banque de l'entreprise."""
+    return collect_invoice(db, tenant_id, invoice_id, payment.model_dump())
+
+
+@router.post("/{invoice_id}/online-payment")
+def start_online_payment(invoice_id: int):
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="Le paiement en ligne n'est pas activé. Enregistrez un encaissement en espèces, virement, chèque ou mobile money.",
     )

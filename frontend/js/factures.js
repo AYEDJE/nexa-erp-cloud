@@ -256,10 +256,11 @@ document.addEventListener("DOMContentLoaded", () => {
         tableBody.innerHTML = invoices.map(inv => {
             let statusClass = "status-draft";
             let statusLabel = "Brouillon";
-            if (inv.status === "paid") {
+            const statusValue = String(inv.status || "").toLowerCase();
+            if (statusValue === "paid") {
                 statusClass = "status-paid";
                 statusLabel = "Payée";
-            } else if (inv.status === "pending") {
+            } else if (statusValue === "pending" || statusValue === "validated" || statusValue === "draft") {
                 statusClass = "status-pending";
                 statusLabel = "En attente";
             }
@@ -886,7 +887,8 @@ document.addEventListener("DOMContentLoaded", () => {
        ========================================================================= */
 
     function canPay(inv) {
-        return normDocType(inv.doc_type) === "INVOICE" && inv.status === "pending";
+        const statusValue = String(inv.status || "").toLowerCase();
+        return normDocType(inv.doc_type) === "INVOICE" && ["pending", "draft", "validated"].includes(statusValue);
     }
 
     const payModal      = document.getElementById("pay-modal");

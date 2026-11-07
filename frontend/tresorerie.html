@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA ERP — Paiements & Trésorerie</title>
+  <script src="js/guard.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .table-container { background:#fff; border-radius:8px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,.05); margin-top:10px; }
+    .data-table { width:100%; border-collapse:collapse; text-align:left; }
+    .data-table th, .data-table td { padding:12px 14px; border-bottom:1px solid #e5e7eb; font-size:13px; }
+    .data-table th { background:#f9fafb; font-weight:600; color:#4b5563; }
+    .btn-primary { background:#1a73e8; color:#fff; border:none; padding:9px 16px; border-radius:6px; cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:6px; font-size:13px; }
+    .btn-ghost { background:#fff; color:#334155; border:1px solid #cbd5e1; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:600; font-size:13px; }
+    .quick-nav-btn { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; }
+    .tabs { display:flex; gap:8px; margin:8px 0 4px; }
+    .tab { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:999px; padding:8px 14px; cursor:pointer; font-weight:600; font-size:13px; }
+    .tab.active { background:#1a73e8; color:#fff; border-color:#1a73e8; }
+    .pill { padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; }
+    .in { background:#dcfce7; color:#166534; }
+    .out { background:#fee2e2; color:#991b1b; }
+    .modal { display:none; position:fixed; z-index:1000; inset:0; background:rgba(0,0,0,.5); overflow-y:auto; }
+    .modal-content { background:#fff; margin:4% auto; padding:25px 30px; border-radius:10px; width:min(560px,94%); position:relative; }
+    .close-btn { position:absolute; right:18px; top:12px; font-size:24px; cursor:pointer; color:#6b7280; }
+    .form-group { margin-bottom:14px; display:flex; flex-direction:column; }
+    .form-group label { margin-bottom:5px; font-weight:600; font-size:13px; color:#374151; }
+    .form-group input, .form-group select { padding:9px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .hint { color:#64748b; font-size:13px; margin:0 0 12px; }
+    .btn-action-small { background:none; border:1px solid #cbd5e1; border-radius:6px; padding:5px 8px; cursor:pointer; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><h2>NEXA <span>ERP</span></h2><small>Votre gestion, notre solution</small></div>
+      <nav class="sidebar-nav">
+        <ul>
+          <li><a href="dashboard.html"><i class="fa-solid fa-house"></i> <span>Tableau de bord</span></a></li>
+          <li><a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Ventes & Factures</span></a></li>
+          <li><a href="produit.html"><i class="fa-solid fa-box-open"></i> <span>Produits & Articles</span></a></li>
+          <li><a href="achats.html"><i class="fa-solid fa-cart-shopping"></i> <span>Achats</span></a></li>
+          <li class="active"><a href="tresorerie.html"><i class="fa-solid fa-coins"></i> <span>Paiements & Trésorerie</span></a></li>
+          <li><a href="clients.html"><i class="fa-solid fa-users"></i> <span>Clients</span></a></li>
+          <li><a href="achats.html#fournisseurs"><i class="fa-solid fa-industry"></i> <span>Fournisseurs</span></a></li>
+        </ul>
+        <p class="nav-section-title">PARAMÈTRES</p>
+        <ul>
+          <li><a href="societe.html"><i class="fa-solid fa-building"></i> <span>Société</span></a></li>
+          <li><a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span>Utilisateurs & Rôles</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <button id="toggle-sidebar" type="button">☰</button>
+        <h3>Paiements & Trésorerie</h3>
+        <div class="topbar-right">
+          <a href="dashboard.html" class="quick-nav-btn"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>
+          <a href="factures.html" class="quick-nav-btn"><i class="fa-solid fa-file-invoice"></i> Factures</a>
+          <a href="achats.html" class="quick-nav-btn"><i class="fa-solid fa-cart-shopping"></i> Achats</a>
+          <button id="open-in" class="btn-primary" type="button"><i class="fa-solid fa-arrow-down"></i> Encaissement</button>
+          <button id="open-out" class="btn-primary" type="button"><i class="fa-solid fa-arrow-up"></i> Décaissement</button>
+          <button id="btn-logout" type="button">Déconnexion</button>
+        </div>
+      </header>
+      <main class="content">
+        <p class="hint" id="company-context"></p>
+        <section class="kpi-section" style="grid-template-columns:repeat(4,1fr);">
+          <div class="kpi-card"><p>Solde disponible</p><h2 id="kpi-balance">0</h2></div>
+          <div class="kpi-card"><p>Encaissements</p><h2 id="kpi-in">0</h2></div>
+          <div class="kpi-card"><p>Décaissements</p><h2 id="kpi-out">0</h2></div>
+          <div class="kpi-card"><p>Reste à encaisser</p><h2 id="kpi-due">0</h2></div>
+        </section>
+        <div id="account-line" class="hint"></div>
+        <div class="tabs">
+          <button class="tab active" type="button" data-tab="mouvements">Mouvements</button>
+          <button class="tab" type="button" data-tab="factures">Factures à encaisser</button>
+          <button class="tab" type="button" data-tab="achats">Achats à payer</button>
+        </div>
+        <section class="table-container" id="panel-mouvements">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Compte</th><th>Libellé</th><th>Tiers</th><th>Sens</th><th>Montant</th></tr></thead>
+            <tbody id="movements-body"></tbody>
+          </table>
+        </section>
+        <section class="table-container" id="panel-factures" hidden>
+          <table class="data-table">
+            <thead><tr><th>Facture</th><th>Client</th><th>Total</th><th>Déjà encaissé</th><th>Reste</th><th></th></tr></thead>
+            <tbody id="invoices-body"></tbody>
+          </table>
+        </section>
+        <section class="table-container" id="panel-achats" hidden>
+          <table class="data-table">
+            <thead><tr><th>Commande</th><th>Fournisseur</th><th>Total</th><th>Déjà payé</th><th>Reste</th><th></th></tr></thead>
+            <tbody id="purchases-body"></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal" id="move-modal">
+    <div class="modal-content">
+      <span class="close-btn" data-close="move-modal">&times;</span>
+      <h3 id="move-title" style="margin-top:0;">Mouvement</h3>
+      <form id="move-form">
+        <div class="form-group"><label for="move-account">Compte</label><select id="move-account" required></select></div>
+        <div class="form-row">
+          <div class="form-group"><label for="move-amount">Montant</label><input id="move-amount" type="number" min="0.01" step="0.01" required></div>
+          <div class="form-group"><label for="move-method">Moyen</label>
+            <select id="move-method">
+              <option value="cash">Espèces</option>
+              <option value="bank_transfer">Virement</option>
+              <option value="cheque">Chèque</option>
+              <option value="mobile_money">Mobile money</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label for="move-label">Libellé</label><input id="move-label" required></div>
+        <div class="form-row">
+          <div class="form-group"><label for="move-party">Tiers</label><input id="move-party"></div>
+          <div class="form-group"><label for="move-reference">Référence</label><input id="move-reference"></div>
+        </div>
+        <button class="btn-primary" type="submit">Enregistrer</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/tresorerie.js"></script>
+</body>
+</html>
