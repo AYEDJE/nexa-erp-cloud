@@ -64,6 +64,13 @@ def ensure_schema_up_to_date(target_engine):
             "locked_until": "DATETIME",
             "last_login_at": "DATETIME",
             "last_login_ip": "TEXT",
+            "last_activity_at": "DATETIME",
+            "phone": "TEXT",
+            "telegram_chat_id": "TEXT",
+            "notify_email": "BOOLEAN DEFAULT 1",
+            "notify_sms": "BOOLEAN DEFAULT 1",
+            "notify_whatsapp": "BOOLEAN DEFAULT 1",
+            "notify_telegram": "BOOLEAN DEFAULT 1",
             "created_at": "DATETIME",
         }
         for name, sql_type in additions.items():

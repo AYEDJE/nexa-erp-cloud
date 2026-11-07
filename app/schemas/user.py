@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     is_active: bool = True
     is_two_factor_enabled: bool = False
     last_login_at: Optional[datetime] = None
+    last_activity_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

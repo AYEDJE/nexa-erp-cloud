@@ -36,6 +36,13 @@ class UserORM(Base):
     locked_until = Column(DateTime, nullable=True)
     last_login_at = Column(DateTime, nullable=True)
     last_login_ip = Column(String, nullable=True)
+    last_activity_at = Column(DateTime, nullable=True)
+    phone = Column(String, nullable=True)
+    telegram_chat_id = Column(String, nullable=True)
+    notify_email = Column(Boolean, default=True, nullable=False)
+    notify_sms = Column(Boolean, default=True, nullable=False)
+    notify_whatsapp = Column(Boolean, default=True, nullable=False)
+    notify_telegram = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relations de sessions et d'appareils

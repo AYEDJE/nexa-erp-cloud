@@ -253,10 +253,10 @@ def login_for_access_token(
         )
     )
 
-    user.last_login_at = datetime.utcnow()
-    user.last_login_ip = client_ip
-
+    from app.services.access_trace import dispatch_login_notifications, record_connection
+    record_connection(db, user, success=True, ip_address=client_ip, user_agent=user_agent, detail="workspace")
     db.commit()
+    dispatch_login_notifications(user.tenant_id, user.id, client_ip)
 
     return {
         "access_token": access_token,
@@ -367,10 +367,10 @@ def _complete_2fa_login(req_body, request, db, payload):
         )
     )
 
-    user.last_login_at = datetime.utcnow()
-    user.last_login_ip = client_ip
-
+    from app.services.access_trace import dispatch_login_notifications, record_connection
+    record_connection(db, user, success=True, ip_address=client_ip, user_agent=user_agent, detail="2fa")
     db.commit()
+    dispatch_login_notifications(user.tenant_id, user.id, client_ip)
 
     return {
         "access_token": access_token,

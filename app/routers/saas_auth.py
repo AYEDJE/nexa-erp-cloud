@@ -130,6 +130,10 @@ def login_for_access_token(
     try:
         user = tenant_db.query(UserORM).filter(UserORM.email == email, UserORM.tenant_id == tenant_id).first()
         if not user or not verify_password(form_data.password, user.hashed_password):
+            if user:
+                from app.services.access_trace import record_connection
+                record_connection(tenant_db, user, success=False, ip_address=get_client_ip(request), user_agent=request.headers.get("User-Agent", ""), detail="mot de passe incorrect")
+                tenant_db.commit()
             record_login_event(email=email, tenant_id=tenant_id, success=False, ip_address=get_client_ip(request), detail="credentials")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-mail ou mot de passe incorrect.", headers={"WWW-Authenticate": "Bearer"})
         if not user.is_active:
@@ -155,16 +159,16 @@ def login_for_access_token(
             device.last_seen = __import__("datetime").datetime.utcnow()
             device.last_ip = client_ip
 
-        now = __import__("datetime").datetime.utcnow()
         user.failed_login_attempts = 0
         user.locked_until = None
         refresh_token, jti, refresh_exp = create_refresh_token({"sub": user.email, "tenant_id": tenant_id, "user_type": user_type, "user_id": user.id})
         access_token = create_access_token({"sub": user.email, "tenant_id": tenant_id, "user_type": user_type, "user_id": user.id, "jti": jti})
         tenant_db.add(UserSessionORM(tenant_id=tenant_id, user_id=user.id, session_token=jti, device_id=device_fp, ip_address=client_ip, user_agent=user_agent, os=ua["os"], browser=ua["browser"], expires_at=refresh_exp))
-        user.last_login_at = now
-        user.last_login_ip = client_ip
+        from app.services.access_trace import dispatch_login_notifications, record_connection
+        record_connection(tenant_db, user, success=True, ip_address=client_ip, user_agent=user_agent, detail="workspace")
         tenant_db.commit()
         record_login_event(email=email, tenant_id=tenant_id, success=True, ip_address=client_ip, detail="workspace")
+        dispatch_login_notifications(tenant_id, user.id, client_ip)
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,

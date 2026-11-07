@@ -84,6 +84,7 @@ def _to_response(user: UserORM, role_names: dict) -> dict:
         "is_active": True if user.is_active is None else user.is_active,
         "is_two_factor_enabled": bool(user.is_two_factor_enabled),
         "last_login_at": user.last_login_at,
+        "last_activity_at": user.last_activity_at,
     }
 
 

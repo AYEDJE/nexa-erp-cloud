@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from app.api import warehouse, invoices, products, users, ai, purchases, treasury
+from app.api import warehouse, invoices, products, users, ai, purchases, treasury, security_trace
 from app.api.audit import router as audit_router
 from app.api.security_admin import router as security_admin_router
 from app.api.documents import router as documents_router
@@ -13,6 +13,7 @@ from app.routers import auth
 from app.core.database import ensure_central_schema
 from app.core.rbac import RoleChecker
 from app.core.middleware import SecurityHeadersMiddleware
+from app.core.activity_middleware import ActivityTraceMiddleware
 import app.models.tenant_registry  # noqa: F401
 from app.routers import saas_auth, saas_platform
 from app.services.saas_platform_service import ensure_platform_defaults
@@ -25,6 +26,7 @@ from app.models.invoice import InvoiceItemORM, InvoiceORM
 from app.models.warehouse import StockMovementORM, WarehouseORM
 from app.models.purchase import PurchaseOrderLineORM, PurchaseOrderORM, SupplierORM
 from app.models.treasury import CashAccountORM, CashMovementORM
+import app.models.activity  # noqa: F401
 from app.models.security import UserSessionORM, UserDeviceORM, SecurityAlertORM
 from app.models.company import CompanyORM
 import app.models.audit
@@ -38,6 +40,7 @@ app = FastAPI(
     version="2.7.0",
 )
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(ActivityTraceMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -56,6 +59,7 @@ app.include_router(invoices.router)
 app.include_router(warehouse.router)
 app.include_router(purchases.router)
 app.include_router(treasury.router)
+app.include_router(security_trace.router)
 app.include_router(documents_router)
 app.include_router(ocr_router)
 app.include_router(search_router)

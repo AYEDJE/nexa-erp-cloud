@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXA ERP — Traçabilité et alertes</title>
+  <script src="js/guard.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .table-container { background:#fff; border-radius:8px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,.05); margin-top:10px; }
+    .data-table { width:100%; border-collapse:collapse; text-align:left; }
+    .data-table th, .data-table td { padding:12px 14px; border-bottom:1px solid #e5e7eb; font-size:13px; }
+    .data-table th { background:#f9fafb; color:#4b5563; }
+    .btn-primary { background:#1a73e8; color:#fff; border:none; padding:9px 16px; border-radius:6px; cursor:pointer; font-weight:600; }
+    .quick-nav-btn { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; }
+    .tabs { display:flex; gap:8px; margin:8px 0 4px; flex-wrap:wrap; }
+    .tab { border:1px solid #cbd5e1; background:#fff; border-radius:999px; padding:8px 14px; cursor:pointer; font-weight:600; font-size:13px; }
+    .tab.active { background:#1a73e8; color:#fff; border-color:#1a73e8; }
+    .hint { color:#64748b; font-size:13px; margin:0 0 12px; }
+    .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .card { background:#fff; border-radius:8px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,.05); }
+    .form-group { margin-bottom:12px; display:flex; flex-direction:column; }
+    .form-group label, .check { font-size:13px; font-weight:600; }
+    .form-group input[type="text"] { padding:9px 12px; border:1px solid #d1d5db; border-radius:6px; }
+    .check { display:flex; gap:8px; align-items:center; margin:8px 0; font-weight:500; }
+    @media (max-width: 800px) { .settings-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><h2>NEXA <span>ERP</span></h2><small>Votre gestion, notre solution</small></div>
+      <nav class="sidebar-nav">
+        <ul>
+          <li><a href="dashboard.html"><i class="fa-solid fa-house"></i> <span>Tableau de bord</span></a></li>
+          <li><a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Ventes & Factures</span></a></li>
+          <li><a href="produit.html"><i class="fa-solid fa-box-open"></i> <span>Produits & Articles</span></a></li>
+          <li><a href="achats.html"><i class="fa-solid fa-cart-shopping"></i> <span>Achats</span></a></li>
+          <li><a href="tresorerie.html"><i class="fa-solid fa-coins"></i> <span>Paiements & Trésorerie</span></a></li>
+          <li><a href="clients.html"><i class="fa-solid fa-users"></i> <span>Clients</span></a></li>
+          <li><a href="stock.html"><i class="fa-solid fa-warehouse"></i> <span>Stock & Entrepôts</span></a></li>
+          <li class="active"><a href="securite.html"><i class="fa-solid fa-shield-halved"></i> <span>Traçabilité & Alertes</span></a></li>
+        </ul>
+        <p class="nav-section-title">PARAMÈTRES</p>
+        <ul>
+          <li><a href="societe.html"><i class="fa-solid fa-building"></i> <span>Société</span></a></li>
+          <li><a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span>Utilisateurs & Rôles</span></a></li>
+        </ul>
+      </nav>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <button type="button">☰</button>
+        <h3>Traçabilité & Alertes</h3>
+        <div class="topbar-right">
+          <a class="quick-nav-btn" href="dashboard.html"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>
+          <button id="btn-logout" type="button">Déconnexion</button>
+        </div>
+      </header>
+      <main class="content">
+        <p class="hint" id="company-context"></p>
+        <section class="kpi-section" style="grid-template-columns:repeat(4,1fr);">
+          <div class="kpi-card"><p>Comptes suivis</p><h2 id="kpi-users">0</h2></div>
+          <div class="kpi-card"><p>Connexions</p><h2 id="kpi-connections">0</h2></div>
+          <div class="kpi-card"><p>Comptes avec activité</p><h2 id="kpi-active">0</h2></div>
+          <div class="kpi-card"><p>Notifications</p><h2 id="kpi-notifications">0</h2></div>
+        </section>
+        <div class="tabs">
+          <button class="tab active" type="button" data-tab="connections">Connexions</button>
+          <button class="tab" type="button" data-tab="activities">Activités</button>
+          <button class="tab" type="button" data-tab="notifications">Notifications</button>
+          <button class="tab" type="button" data-tab="settings">Canaux</button>
+        </div>
+        <section class="table-container" id="panel-connections">
+          <table class="data-table">
+            <thead><tr><th>Utilisateur</th><th>Email</th><th>Dernière connexion</th><th>Dernière activité</th><th>Adresse IP</th></tr></thead>
+            <tbody id="users-body"></tbody>
+          </table>
+          <table class="data-table" style="margin-top:18px;">
+            <thead><tr><th>Date</th><th>Heure</th><th>Email</th><th>Événement</th><th>Adresse IP</th></tr></thead>
+            <tbody id="connections-body"></tbody>
+          </table>
+        </section>
+        <section class="table-container" id="panel-activities" hidden>
+          <table class="data-table">
+            <thead><tr><th>Moment</th><th>Email</th><th>Type</th><th>Détail</th></tr></thead>
+            <tbody id="activities-body"></tbody>
+          </table>
+        </section>
+        <section class="table-container" id="panel-notifications" hidden>
+          <p class="hint">Chaque nouvelle connexion déclenche un email, un SMS, un WhatsApp et un Telegram. Le suivi indique si le message est parti, si le canal n'est pas encore branché, ou si le destinataire manque.</p>
+          <table class="data-table">
+            <thead><tr><th>Moment</th><th>Compte</th><th>Canal</th><th>Résultat</th><th>Détail</th></tr></thead>
+            <tbody id="notifications-body"></tbody>
+          </table>
+        </section>
+        <section id="panel-settings" hidden>
+          <div class="settings-grid">
+            <form class="card" id="profile-form">
+              <h3 style="margin-top:0;">Mon compte</h3>
+              <p class="hint">Le SMS et WhatsApp utilisent le numéro. Telegram utilise l'identifiant de discussion obtenu auprès du bot de l'entreprise.</p>
+              <div class="form-group"><label for="phone">Téléphone</label><input id="phone" type="text" placeholder="+228..."></div>
+              <div class="form-group"><label for="telegram">Identifiant Telegram</label><input id="telegram" type="text"></div>
+              <label class="check"><input id="notify-email" type="checkbox"> Email</label>
+              <label class="check"><input id="notify-sms" type="checkbox"> SMS</label>
+              <label class="check"><input id="notify-whatsapp" type="checkbox"> WhatsApp</label>
+              <label class="check"><input id="notify-telegram" type="checkbox"> Telegram</label>
+              <button class="btn-primary" type="submit">Enregistrer</button>
+            </form>
+            <form class="card" id="policy-box">
+              <h3 style="margin-top:0;">Canaux de l'entreprise</h3>
+              <p class="hint">L'administrateur active ou coupe un canal pour tous les comptes de cette entreprise.</p>
+              <div id="policy-form">
+                <label class="check"><input id="policy-email" type="checkbox"> Email</label>
+                <label class="check"><input id="policy-sms" type="checkbox"> SMS</label>
+                <label class="check"><input id="policy-whatsapp" type="checkbox"> WhatsApp</label>
+                <label class="check"><input id="policy-telegram" type="checkbox"> Telegram</label>
+                <button class="btn-primary" type="button" id="save-policy">Enregistrer les canaux</button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/securite.js"></script>
+</body>
+</html>

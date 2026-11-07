@@ -24,6 +24,7 @@ def _import_erp_models() -> None:
     import app.models.warehouse  # noqa: F401
     import app.models.purchase  # noqa: F401
     import app.models.treasury  # noqa: F401
+    import app.models.activity  # noqa: F401
 
 
 def generate_environment_code(central) -> str:
