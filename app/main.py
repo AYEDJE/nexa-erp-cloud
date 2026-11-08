@@ -9,6 +9,7 @@ from app.api.ocr import router as ocr_router
 from app.api.search import router as search_router
 from app.api.backups import router as backups_router
 from app.api.company import router as company_router
+from app.api import idp
 from app.routers import auth
 from app.core.database import ensure_central_schema
 from app.core.rbac import RoleChecker
@@ -70,7 +71,7 @@ app.include_router(audit_router)
 app.include_router(security_admin_router)
 app.include_router(backups_router)
 app.include_router(company_router)
-
+app.include_router(idp.router)
 allow_admin_only = RoleChecker(["admin", "super_admin"])
 
 
