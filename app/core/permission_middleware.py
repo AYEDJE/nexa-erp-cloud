@@ -11,6 +11,8 @@ MODULE_BY_PREFIX = (
     ("/treasury", "tresorerie"),
     ("/documents", "documents"),
     ("/ocr", "documents"),
+    ("/idp", "documents"),
+    ("/ai", "ai"),
     ("/company", "rh"),
     ("/users", "rh"),
     ("/admin/backups", "documents"),
