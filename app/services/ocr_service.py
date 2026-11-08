@@ -1,12 +1,82 @@
 import re
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
+
+
+_LABEL_VALUE_RE = re.compile(r"^\s*([^:：]{1,60})\s*[:：]\s*(.*?)\s*$")
+_KNOWN_LABELS = {
+    "facture", "invoice", "numéro", "numero", "date", "date d'échéance",
+    "due date", "fournisseur", "supplier", "client", "customer", "nif",
+    "ice", "siret", "tva", "total ht", "total ttc", "total tva",
+    "subtotal", "tax amount", "total amount", "net à payer", "montant total",
+}
+
+
+def _document_language(text: str) -> str:
+    if re.search(r"[\u0600-\u06FF]", text):
+        return "ar"
+    french_markers = (" facture", " fournisseur", " échéance", " montant", " société", " contrat")
+    lowered = f" {text.lower()}"
+    return "fr" if any(marker in lowered for marker in french_markers) else "en"
+
+
+def _document_type(text: str) -> str:
+    lowered = text.lower()
+    if re.search(r"\b(facture|invoice|فاتورة)\b", lowered) or "فاتورة" in text:
+        return "INVOICE"
+    if re.search(r"\b(contrat|contract|اتفاقية|عقد)\b", lowered):
+        return "CONTRACT"
+    if re.search(r"\b(bon de commande|purchase order|commande)\b", lowered):
+        return "PURCHASE_ORDER"
+    if re.search(r"\b(rapport|report|تقرير)\b", lowered):
+        return "REPORT"
+    if re.search(r"\b(reçu|receipt|recu)\b", lowered):
+        return "RECEIPT"
+    return "UNKNOWN"
+
+
+def _extract_dynamic_fields(lines: List[str]) -> List[Dict[str, str]]:
+    """Keep labeled facts that do not map to the current fixed invoice schema."""
+    fields: List[Dict[str, str]] = []
+    seen = set()
+    for line in lines:
+        match = _LABEL_VALUE_RE.match(line)
+        if not match:
+            continue
+        label, value = match.groups()
+        label = " ".join(label.strip().split())
+        value = value.strip()
+        key = label.casefold()
+        if not value or key in _KNOWN_LABELS or key in seen:
+            continue
+        seen.add(key)
+        fields.append({"label": label, "value": value, "source": line[:500]})
+    return fields
+
+
+def _extract_tables(lines: List[str]) -> List[Dict[str, Any]]:
+    """Preserve simple pipe/tab-delimited rows for review instead of discarding them."""
+    rows = []
+    for line in lines:
+        if "|" in line:
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        elif "\t" in line:
+            cells = [cell.strip() for cell in line.split("\t")]
+        else:
+            continue
+        if len(cells) > 1 and any(cells):
+            rows.append(cells)
+    if not rows:
+        return []
+    headers = rows[0]
+    return [{"headers": headers, "rows": rows[1:]}]
 
 
 def extract_document_data_from_text(raw_text: str) -> Dict[str, Any]:
-    """
-    Moteur intelligent d'OCR et d'extraction de données de documents (factures, reçus, BL).
-    Reconnaît les numéros de pièce, montants, dates, identifiants fiscaux et fournisseurs.
+    """Extract common invoice fields and retain additional labeled/table data for review.
+
+    This is structured-text extraction, not OCR: callers must provide text obtained from
+    a trusted OCR or document text-extraction step. Extracted values are suggestions and
+    must be checked before being written to ERP records.
     """
     result: Dict[str, Any] = {
         "doc_type": "INVOICE",
@@ -19,108 +89,71 @@ def extract_document_data_from_text(raw_text: str) -> Dict[str, Any]:
         "tax_amount": 0.0,
         "total_ttc": 0.0,
         "confidence_score": 0.85,
-        "extracted_items": []
+        "extracted_items": [],
     }
-
     if not raw_text:
+        result.update({"doc_type": "UNKNOWN", "document_language": "en", "dynamic_fields": [], "tables": [], "review_required": True})
         return result
 
     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    result["doc_type"] = _document_type(raw_text)
+    result["document_language"] = _document_language(raw_text)
+    result["dynamic_fields"] = _extract_dynamic_fields(lines)
+    result["tables"] = _extract_tables(lines)
+    result["review_required"] = True
 
-    # 1. Extraction du numéro de document (ex: FAC-2026-001, INV/2026/09, Facture N° 12345)
     doc_num_match = re.search(
         r"(?:facture|invoice|facture\s+n[°o]|réf|ref)\s*[:#\-]?\s*([A-Z0-9\-_/]{4,20})",
-        raw_text,
-        re.IGNORECASE
+        raw_text, re.IGNORECASE,
     )
     if doc_num_match:
         result["document_number"] = doc_num_match.group(1).strip()
     else:
-        # Recherche d'un token ressemblant à un code facture
         token_match = re.search(r"\b(INV|FAC|BC|BL)[-_/]\d{4,}\b", raw_text, re.IGNORECASE)
         if token_match:
             result["document_number"] = token_match.group(0).upper()
 
-    # 2. Extraction des dates (DD/MM/YYYY ou YYYY-MM-DD)
     date_matches = re.findall(r"\b(\d{1,2}[/\-]\d{1,2}[/\-]\d{4}|\d{4}[/\-]\d{1,2}[/\-]\d{1,2})\b", raw_text)
-    if date_matches:
-        for dm in date_matches:
-            # Normalisation
-            dm_clean = dm.replace("/", "-")
-            parts = dm_clean.split("-")
-            if len(parts[0]) == 4:
-                iso_date = f"{parts[0]}-{parts[1].zfill(2)}-{parts[2].zfill(2)}"
-            else:
-                iso_date = f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+    for dm in date_matches:
+        parts = dm.replace("/", "-").split("-")
+        iso_date = f"{parts[0]}-{parts[1].zfill(2)}-{parts[2].zfill(2)}" if len(parts[0]) == 4 else f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+        if not result["date"]:
+            result["date"] = iso_date
+        elif not result["due_date"] and iso_date != result["date"]:
+            result["due_date"] = iso_date
 
-            if not result["date"]:
-                result["date"] = iso_date
-            elif not result["due_date"] and iso_date != result["date"]:
-                result["due_date"] = iso_date
-
-    # 3. Extraction de l'identifiant fiscal (NIF / ICE / SIRET / TVA)
-    tax_match = re.search(
-        r"(?:NIF|ICE|SIRET|TVA\s*intracommunautaire|Tax\s*ID)\s*[:#\-]?\s*([A-Z0-9\s]{6,20})",
-        raw_text,
-        re.IGNORECASE
-    )
+    tax_match = re.search(r"(?:NIF|ICE|SIRET|TVA\s*intracommunautaire|Tax\s*ID)\s*[:#\-]?\s*([A-Z0-9\s]{6,20})", raw_text, re.IGNORECASE)
     if tax_match:
         result["tax_id"] = tax_match.group(1).strip()
 
-    # 4. Extraction des montants (Total HT, TVA, Total TTC)
-    # Total TTC
-    ttc_match = re.search(
-        r"(?:total\s*ttc|net\s*à\s*payer|montant\s*total|total\s*amount)\s*[:#\-]?\s*([\d\s]+(?:[,\.]\d{2})?)",
-        raw_text,
-        re.IGNORECASE
-    )
-    if ttc_match:
-        clean_num = ttc_match.group(1).replace(" ", "").replace(",", ".")
+    def parse_amount(pattern: str) -> float:
+        match = re.search(pattern, raw_text, re.IGNORECASE)
+        if not match:
+            return 0.0
+        value = re.sub(r"\s", "", match.group(1)).replace(",", ".")
         try:
-            result["total_ttc"] = float(clean_num)
+            return float(value)
         except ValueError:
-            pass
+            return 0.0
 
-    # Total HT
-    ht_match = re.search(
-        r"(?:total\s*ht|montant\s*ht|subtotal)\s*[:#\-]?\s*([\d\s]+(?:[,\.]\d{2})?)",
-        raw_text,
-        re.IGNORECASE
-    )
-    if ht_match:
-        clean_ht = ht_match.group(1).replace(" ", "").replace(",", ".")
-        try:
-            result["total_ht"] = float(clean_ht)
-        except ValueError:
-            pass
+    result["total_ttc"] = parse_amount(r"(?:total\s*ttc|net\s*à\s*payer|montant\s*total|total\s*amount)\s*[:#\-]?\s*([\d\s]+(?:[,\.]\d{2})?)")
+    result["total_ht"] = parse_amount(r"(?:total\s*ht|montant\s*ht|subtotal)\s*[:#\-]?\s*([\d\s]+(?:[,\.]\d{2})?)")
+    result["tax_amount"] = parse_amount(r"(?:total\s*tva|montant\s*tva|tax\s*amount)\s*[:#\-]?\s*([\d\s]+(?:[,\.]\d{2})?)")
 
-    # Montant TVA
-    tva_match = re.search(
-        r"(?:total\s*tva|montant\s*tva|tax\s*amount)\s*[:#\-]?\s*([\d\s]+(?:[,\.]\d{2})?)",
-        raw_text,
-        re.IGNORECASE
-    )
-    if tva_match:
-        clean_tva = tva_match.group(1).replace(" ", "").replace(",", ".")
-        try:
-            result["tax_amount"] = float(clean_tva)
-        except ValueError:
-            pass
-
-    # Calcul de déduction si l'un des montants est manquant
     if result["total_ttc"] > 0 and result["total_ht"] == 0.0 and result["tax_amount"] > 0:
         result["total_ht"] = round(result["total_ttc"] - result["tax_amount"], 2)
-    elif result["total_ttc"] == 0.0 and result["total_ht"] > 0 and result["tax_amount"] >= 0:
+    elif result["total_ttc"] == 0.0 and result["total_ht"] > 0:
         result["total_ttc"] = round(result["total_ht"] + result["tax_amount"], 2)
+    if result["total_ttc"] and result["total_ht"] and result["tax_amount"] and abs(result["total_ht"] + result["tax_amount"] - result["total_ttc"]) > 0.02:
+        result["warnings"] = ["Les montants HT, TVA et TTC semblent incohérents ; vérification requise."]
+    else:
+        result["warnings"] = []
 
-    # 5. Détection du fournisseur (généralement dans les 3 premières lignes)
     for line in lines[:3]:
-        if not re.search(r"(facture|invoice|devis|bon)", line, re.IGNORECASE):
+        if not re.search(r"(facture|invoice|devis|bon|فاتورة)", line, re.IGNORECASE):
             result["supplier_name"] = line
             break
 
-    # 6. Extraction basique des lignes d'articles
-    # Lignes composées d'un texte suivi de prix (ex: "Licence Cloud SaaS 2 50000 100000")
     for line in lines:
         row_match = re.match(r"^([A-Za-z0-9\s\-]+?)\s+(\d+)\s+([\d\s]+[,\.]\d{2})\s+([\d\s]+[,\.]\d{2})$", line)
         if row_match:
@@ -129,9 +162,8 @@ def extract_document_data_from_text(raw_text: str) -> Dict[str, Any]:
                     "product_name": row_match.group(1).strip(),
                     "quantity": int(row_match.group(2)),
                     "unit_price_ht": float(row_match.group(3).replace(" ", "").replace(",", ".")),
-                    "total_ht": float(row_match.group(4).replace(" ", "").replace(",", "."))
+                    "total_ht": float(row_match.group(4).replace(" ", "").replace(",", ".")),
                 })
-            except Exception:
+            except (TypeError, ValueError):
                 continue
-
     return result

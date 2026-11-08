@@ -5,216 +5,87 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NEXA ERP — Tableau de bord</title>
   <script src="js/guard.js"></script>
+  <script src="js/ai-assistant.js"></script>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/dashboard.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    .quick-nav-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.2s ease;
-    }
-    .quick-nav-btn.primary {
-      background: #1a73e8;
-      color: #fff;
-    }
-    .quick-nav-btn.primary:hover {
-      background: #1557b0;
-      transform: translateY(-1px);
-    }
-    .quick-nav-btn.secondary {
-      background: #e8f0fe;
-      color: #1a73e8;
-      border: 1px solid #cce0ff;
-    }
-    .quick-nav-btn.secondary:hover {
-      background: #d2e3fc;
-    }
-    .kpi-card.clickable {
-      cursor: pointer;
-      position: relative;
-    }
-    .kpi-card.clickable:hover {
-      border-left-color: #1a73e8;
-      box-shadow: 0 6px 16px rgba(26, 115, 232, 0.15);
-    }
-    .kpi-action-link {
-      font-size: 11px;
-      font-weight: 600;
-      color: #1a73e8;
-      display: inline-block;
-      margin-top: 4px;
-    }
+    .quick-nav-btn { display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; transition:all .2s ease; }
+    .quick-nav-btn.primary { background:#1a73e8; color:#fff; }
+    .quick-nav-btn.primary:hover { background:#1557b0; transform:translateY(-1px); }
+    .quick-nav-btn.secondary { background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; }
+    .quick-nav-btn.secondary:hover { background:#d2e3fc; }
+    .kpi-card.clickable { cursor:pointer; position:relative; }
+    .kpi-card.clickable:hover { border-left-color:#1a73e8; box-shadow:0 6px 16px rgba(26,115,232,.15); }
+    .kpi-action-link { font-size:11px; font-weight:600; color:#1a73e8; display:inline-block; margin-top:4px; }
   </style>
 </head>
-
 <body>
   <script>
     if (!sessionStorage.getItem('access_token') && !localStorage.getItem('access_token')) {
       window.location.href = 'index.html';
     }
   </script>
-
   <div class="app">
-    <!-- Barre latérale -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-logo">
-        <h2>NEXA <span>ERP</span></h2>
-        <small>Votre gestion, notre solution</small>
-      </div>
-
-      <!-- Navigation -->
+      <div class="sidebar-logo"><h2>NEXA <span>ERP</span></h2><small>Votre gestion, notre solution</small></div>
       <nav class="sidebar-nav">
         <ul>
-          <li class="active">
-            <a href="dashboard.html"><i class="fa-solid fa-house"></i> <span data-i18n="nav_dashboard">Tableau de bord</span></a>
-          </li>
-          <li>
-            <a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span data-i18n="nav_invoices">Ventes & Factures</span></a>
-          </li>
-          <li>
-            <a href="produit.html"><i class="fa-solid fa-box-open"></i> <span data-i18n="nav_products">Produits & Articles</span></a>
-          </li>
-          <li>
-            <a href="clients.html"><i class="fa-solid fa-users"></i> <span data-i18n="nav_clients">Clients</span></a>
-          </li>
-          <li>
-            <a href="achats.html"><i class="fa-solid fa-cart-shopping"></i> <span data-i18n="nav_purchases">Achats</span></a>
-          </li>
-          <li>
-            <a href="tresorerie.html"><i class="fa-solid fa-coins"></i> <span data-i18n="nav_treasury">Paiements & Trésorerie</span></a>
-          </li>
-          <li>
-            <a href="achats.html#fournisseurs"><i class="fa-solid fa-industry"></i> <span data-i18n="nav_suppliers">Fournisseurs</span></a>
-          </li>
-          <li>
-            <a href="stock.html"><i class="fa-solid fa-warehouse"></i> <span data-i18n="nav_warehouses">Stock & Entrepôts</span></a>
-          </li>
-          <li>
-            <a href="securite.html"><i class="fa-solid fa-shield-halved"></i> <span>Traçabilité & Alertes</span></a>
-          </li>
-          <li>
-            <a href="gouvernance.html"><i class="fa-solid fa-user-lock"></i> <span>Sessions & Sauvegardes</span></a>
-          </li>
-          <li>
-            <a href="#"><i class="fa-solid fa-chart-line"></i> <span data-i18n="nav_reports">Rapports & Stats</span></a>
-          </li>
+          <li class="active"><a href="dashboard.html"><i class="fa-solid fa-house"></i> <span data-i18n="nav_dashboard">Tableau de bord</span></a></li>
+          <li><a href="factures.html"><i class="fa-solid fa-file-invoice-dollar"></i> <span data-i18n="nav_invoices">Ventes & Factures</span></a></li>
+          <li><a href="produit.html"><i class="fa-solid fa-box-open"></i> <span data-i18n="nav_products">Produits & Articles</span></a></li>
+          <li><a href="clients.html"><i class="fa-solid fa-users"></i> <span data-i18n="nav_clients">Clients</span></a></li>
+          <li><a href="achats.html"><i class="fa-solid fa-cart-shopping"></i> <span data-i18n="nav_purchases">Achats</span></a></li>
+          <li><a href="tresorerie.html"><i class="fa-solid fa-coins"></i> <span data-i18n="nav_treasury">Paiements & Trésorerie</span></a></li>
+          <li><a href="achats.html#fournisseurs"><i class="fa-solid fa-industry"></i> <span data-i18n="nav_suppliers">Fournisseurs</span></a></li>
+          <li><a href="stock.html"><i class="fa-solid fa-warehouse"></i> <span data-i18n="nav_warehouses">Stock & Entrepôts</span></a></li>
+          <li><a href="securite.html"><i class="fa-solid fa-shield-halved"></i> <span>Traçabilité & Alertes</span></a></li>
+          <li><a href="gouvernance.html"><i class="fa-solid fa-user-lock"></i> <span>Sessions & Sauvegardes</span></a></li>
+          <li><a href="#"><i class="fa-solid fa-chart-line"></i> <span data-i18n="nav_reports">Rapports & Stats</span></a></li>
         </ul>
-
-        <!-- Séparateur Paramètres -->
         <p class="nav-section-title" data-i18n="nav_settings">PARAMÈTRES</p>
         <ul>
           <li><a href="societe.html"><i class="fa-solid fa-building"></i> <span data-i18n="nav_company">Société</span></a></li>
-          <li>
-            <a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span data-i18n="nav_users">Utilisateurs & Rôles</span></a>
-          </li>
+          <li><a href="utilisateurs.html"><i class="fa-solid fa-user-shield"></i> <span data-i18n="nav_users">Utilisateurs & Rôles</span></a></li>
           <li><a href="#"><i class="fa-solid fa-gear"></i> <span data-i18n="nav_general_settings">Paramètres généraux</span></a></li>
         </ul>
       </nav>
     </aside>
-
     <div class="main">
-      <!-- TOPBAR -->
       <header class="topbar">
         <button id="toggle-sidebar">☰</button>
         <h3 data-i18n="topbar_dashboard">Tableau de bord</h3>
-
         <div class="topbar-right">
-          <!-- BOUTONS D'ACCÈS RAPIDE -->
-          <a href="produit.html" class="quick-nav-btn primary" title="Accéder directement à la gestion des produits">
-            <i class="fa-solid fa-box-open"></i> <span data-i18n="topbar_products">Produits</span>
-          </a>
-          <a href="factures.html" class="quick-nav-btn secondary" title="Accéder à la facturation">
-            <i class="fa-solid fa-file-invoice"></i> <span data-i18n="topbar_invoices">Factures</span>
-          </a>
-          <a href="achats.html" class="quick-nav-btn secondary" title="Bons de commande et fournisseurs">
-            <i class="fa-solid fa-cart-shopping"></i> Achats
-          </a>
-          <a href="clients.html" class="quick-nav-btn secondary" title="Gérer le portefeuille clients">
-            <i class="fa-solid fa-users"></i> Clients
-          </a>
-          <a href="utilisateurs.html" class="quick-nav-btn secondary" title="Gérer les collaborateurs">
-            <i class="fa-solid fa-user-shield"></i> <span data-i18n="topbar_users">Utilisateurs</span>
-          </a>
-
+          <a href="produit.html" class="quick-nav-btn primary" title="Accéder directement à la gestion des produits"><i class="fa-solid fa-box-open"></i> <span data-i18n="topbar_products">Produits</span></a>
+          <a href="factures.html" class="quick-nav-btn secondary" title="Accéder à la facturation"><i class="fa-solid fa-file-invoice"></i> <span data-i18n="topbar_invoices">Factures</span></a>
+          <a href="achats.html" class="quick-nav-btn secondary" title="Bons de commande et fournisseurs"><i class="fa-solid fa-cart-shopping"></i> Achats</a>
+          <a href="clients.html" class="quick-nav-btn secondary" title="Gérer le portefeuille clients"><i class="fa-solid fa-users"></i> Clients</a>
+          <a href="utilisateurs.html" class="quick-nav-btn secondary" title="Gérer les collaborateurs"><i class="fa-solid fa-user-shield"></i> <span data-i18n="topbar_users">Utilisateurs</span></a>
           <span id="current-date">📅 ...</span>
           <button class="btn-icon">🔔 <span class="badge">3</span></button>
-
-          <!-- PROFIL UTILISATEUR DYNAMIQUE -->
-          <div class="user-info">
-            <img id="user-avatar" src="https://ui-avatars.com/api/?name=Admin&background=1a73e8&color=fff" alt="avatar">
-            <span id="user-display-name">Admin</span>
-          </div>
-
+          <div class="user-info"><img id="user-avatar" src="https://ui-avatars.com/api/?name=Admin&background=1a73e8&color=fff" alt="avatar"><span id="user-display-name">Admin</span></div>
           <button id="btn-logout" data-i18n="btn_logout">Déconnexion</button>
         </div>
       </header>
-
-      <!-- CONTENU PRINCIPAL -->
       <main class="content">
-
-        <!-- KPI CARDS CLIQUABLES -->
         <section class="kpi-section">
-          <div class="kpi-card clickable" onclick="window.location.href='produit.html'" title="Cliquez pour gérer les produits">
-            <p data-i18n="kpi_products">Produits</p>
-            <h2 id="kpi-produits">...</h2>
-            <span class="kpi-action-link" data-i18n="link_manage_products">Gérer les produits &rarr;</span>
-          </div>
-
-          <div class="kpi-card clickable" onclick="window.location.href='factures.html'" title="Cliquez pour voir les factures">
-            <p data-i18n="kpi_ca">Chiffre d'affaires</p>
-            <h2 id="kpi-ca">...</h2>
-            <span class="kpi-action-link" data-i18n="link_view_sales">Voir les ventes &rarr;</span>
-          </div>
-
-          <div class="kpi-card clickable" onclick="window.location.href='factures.html'" title="Cliquez pour voir les factures en attente">
-            <p data-i18n="kpi_pending">Factures en attente</p>
-            <h2 id="kpi-en-attente">...</h2>
-            <span class="kpi-action-link" data-i18n="link_check_pending">Consulter &rarr;</span>
-          </div>
-
-          <div class="kpi-card clickable" onclick="window.location.href='clients.html'" title="Cliquez pour gérer les clients">
-            <p>Clients Actifs</p>
-            <h2 id="kpi-clients-total">4</h2>
-            <span class="kpi-action-link">Voir les clients &rarr;</span>
-          </div>
-
-          <div class="kpi-card clickable" onclick="window.location.href='utilisateurs.html'" title="Cliquez pour gérer les collaborateurs">
-            <p data-i18n="kpi_team">Collaborateurs</p>
-            <h2 id="kpi-entrepots">5</h2>
-            <span class="kpi-action-link" data-i18n="link_manage_team">Gérer l'équipe &rarr;</span>
-          </div>
+          <div class="kpi-card clickable" onclick="window.location.href='produit.html'" title="Cliquez pour gérer les produits"><p data-i18n="kpi_products">Produits</p><h2 id="kpi-produits">...</h2><span class="kpi-action-link" data-i18n="link_manage_products">Gérer les produits &rarr;</span></div>
+          <div class="kpi-card clickable" onclick="window.location.href='factures.html'" title="Cliquez pour voir les factures"><p data-i18n="kpi_ca">Chiffre d'affaires</p><h2 id="kpi-ca">...</h2><span class="kpi-action-link" data-i18n="link_view_sales">Voir les ventes &rarr;</span></div>
+          <div class="kpi-card clickable" onclick="window.location.href='factures.html'" title="Cliquez pour voir les factures en attente"><p data-i18n="kpi_pending">Factures en attente</p><h2 id="kpi-en-attente">...</h2><span class="kpi-action-link" data-i18n="link_check_pending">Consulter &rarr;</span></div>
+          <div class="kpi-card clickable" onclick="window.location.href='clients.html'" title="Cliquez pour gérer les clients"><p>Clients Actifs</p><h2 id="kpi-clients-total">4</h2><span class="kpi-action-link">Voir les clients &rarr;</span></div>
+          <div class="kpi-card clickable" onclick="window.location.href='utilisateurs.html'" title="Cliquez pour gérer les collaborateurs"><p data-i18n="kpi_team">Collaborateurs</p><h2 id="kpi-entrepots">5</h2><span class="kpi-action-link" data-i18n="link_manage_team">Gérer l'équipe &rarr;</span></div>
         </section>
-
-        <!-- GRAPHIQUES -->
         <section class="charts-section">
-          <div class="chart-card large">
-            <div class="chart-header">
-              <h3 data-i18n="chart_stock">Valeur du stock par produit</h3>
-            </div>
-            <canvas id="chart-stock"></canvas>
-          </div>
-          <div class="chart-card small">
-            <div class="chart-header">
-              <h3 data-i18n="chart_invoices">Répartition des factures</h3>
-            </div>
-            <canvas id="chart-factures"></canvas>
-          </div>
+          <div class="chart-card large"><div class="chart-header"><h3 data-i18n="chart_stock">Valeur du stock par produit</h3></div><canvas id="chart-stock"></canvas></div>
+          <div class="chart-card small"><div class="chart-header"><h3 data-i18n="chart_invoices">Répartition des factures</h3></div><canvas id="chart-factures"></canvas></div>
         </section>
-
       </main>
     </div>
   </div>
-
   <script src="js/auth.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="js/ai-assistant.js"></script>
   <script src="js/dashboard.js"></script>
 </body>
 </html>
