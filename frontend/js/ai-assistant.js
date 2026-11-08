@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+HEAD
 (() => {
   const API = window.API || "http://127.0.0.1:8000";
   const languages = {
@@ -145,7 +145,6 @@
     });
   }
 })();
-=======
 /* NexaERP voice assistant: browser speech APIs + existing /ai/query endpoint. */
 (() => {
   'use strict';
@@ -279,4 +278,3 @@
     try { recognition.start(); } catch (_) { recognition.stop(); }
   });
 })();
->>>>>>> 31053e7edb24f16ff9ef1541f93af9ed864b63f7
