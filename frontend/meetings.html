@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NexaERP — Réunions vidéo</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }
+    body { margin: 0; }
+    header { background: #165dce; color: white; padding: 16px 22px; display:flex; justify-content:space-between; align-items:center; }
+    main { max-width: 1180px; margin: 20px auto; padding: 0 16px; }
+    .card { background:white; border:1px solid #dbe3ef; border-radius:12px; padding:16px; margin-bottom:16px; }
+    input,button { font:inherit; border-radius:7px; padding:10px 12px; }
+    input { border:1px solid #cbd5e1; }
+    button { border:0; color:white; background:#165dce; cursor:pointer; }
+    button.secondary { background:#475569; }
+    button.danger { background:#b42318; }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; }
+    .meeting-row { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #e2e8f0; }
+    #videos { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+    video { width:100%; aspect-ratio:16/9; object-fit:cover; background:#111827; border-radius:10px; }
+    .video-card { position:relative; }
+    .video-card span { position:absolute; bottom:10px; left:10px; color:white; background:#0009; border-radius:5px; padding:4px 8px; }
+    #status { min-height:1.5em; color:#526174; }
+    .muted { color:#64748b; font-size:.92em; }
+    @media(max-width:600px) { .meeting-row { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <header><strong>NexaERP · Réunions vidéo</strong><a href="dashboard.html" style="color:white">Retour au tableau de bord</a></header>
+  <main>
+    <section class="card">
+      <h2>Créer une réunion</h2>
+      <form id="create-form" class="controls">
+        <input id="meeting-title" required minlength="2" maxlength="120" placeholder="Ex. Réunion commerciale">
+        <button type="submit">Créer</button>
+      </form>
+      <p class="muted">La caméra et le micro nécessitent HTTPS en production (localhost est accepté en développement). Les participants doivent avoir un compte actif dans la même entreprise.</p>
+    </section>
+    <section class="card">
+      <h2>Mes réunions</h2>
+      <div id="meeting-list"></div>
+    </section>
+    <section class="card" id="call-panel" hidden>
+      <h2 id="call-title">Appel</h2>
+      <div class="controls">
+        <button id="mic-toggle" type="button">Couper le micro</button>
+        <button id="camera-toggle" type="button">Couper la caméra</button>
+        <button id="hangup" class="danger" type="button">Quitter</button>
+      </div>
+      <p id="status" role="status">Prêt.</p>
+      <div id="videos"></div>
+      <form id="invite-form" class="controls">
+        <input id="invite-email" type="email" required placeholder="E-mail d’un collègue de l’entreprise">
+        <button type="submit">Ajouter participant</button>
+      </form>
+      <p id="invite-status" class="muted"></p>
+    </section>
+  </main>
+  <script src="js/meetings.js"></script>
+</body>
+</html>
