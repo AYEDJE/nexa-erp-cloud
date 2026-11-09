@@ -33,7 +33,6 @@ from app.models.security import UserSessionORM, UserDeviceORM, SecurityAlertORM
 from app.models.company import CompanyORM
 import app.models.audit
 import app.models.meeting 
-import MeetingMemberORM, MeetingORM
 
 ensure_central_schema()
 ensure_platform_defaults()
