@@ -19,7 +19,7 @@ from app.core.permission_middleware import ModulePermissionMiddleware
 import app.models.tenant_registry  # noqa: F401
 from app.routers import saas_auth, saas_platform
 from app.services.saas_platform_service import ensure_platform_defaults
-
+from app.api import meetings
 # Import all ERP models so their metadata is available to tenant provisioning.
 from app.models.user import UserORM
 from app.models.product import ProductORM
@@ -32,6 +32,8 @@ import app.models.activity  # noqa: F401
 from app.models.security import UserSessionORM, UserDeviceORM, SecurityAlertORM
 from app.models.company import CompanyORM
 import app.models.audit
+import app.models.meeting 
+import MeetingMemberORM, MeetingORM
 
 ensure_central_schema()
 ensure_platform_defaults()
@@ -72,6 +74,7 @@ app.include_router(security_admin_router)
 app.include_router(backups_router)
 app.include_router(company_router)
 app.include_router(idp.router)
+app.include_router(meetings.router)
 allow_admin_only = RoleChecker(["admin", "super_admin"])
 
 
