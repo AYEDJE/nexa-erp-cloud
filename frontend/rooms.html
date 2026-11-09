@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NexaERP — Room Live</title>
+  <style>
+    body { font: 15px system-ui, sans-serif; margin: 0; background: #f3f6fb; color: #172033; }
+    header { padding: 16px 24px; color: white; background: #165dce; }
+    main { display: grid; grid-template-columns: 280px 1fr; gap: 16px; max-width: 1200px; margin: 20px auto; padding: 0 16px; }
+    section { background: white; border: 1px solid #dbe3ef; border-radius: 12px; padding: 16px; }
+    input, textarea, button { font: inherit; padding: 10px; border: 1px solid #cbd5e1; border-radius: 7px; }
+    input, textarea { box-sizing: border-box; width: 100%; margin: 5px 0; }
+    button { cursor: pointer; background: #165dce; color: white; border: 0; }
+    button.secondary { background: #64748b; }
+    .room-button { width: 100%; margin: 4px 0; text-align: left; }
+    #messages { height: 45vh; overflow-y: auto; border: 1px solid #e2e8f0; padding: 10px; margin: 10px 0; }
+    .message { padding: 8px; margin: 6px 0; background: #f1f5f9; border-radius: 8px; overflow-wrap: anywhere; }
+    .muted { color: #64748b; font-size: 13px; }
+    .row { display: flex; gap: 8px; }
+    .row input { flex: 1; }
+    #status { min-height: 20px; color: #526174; }
+    @media (max-width: 700px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header><strong>NexaERP — Room Live</strong> <span id="presence"></span></header>
+  <main>
+    <section>
+      <h2>Mes espaces</h2>
+      <form id="create-room">
+        <input id="room-name" required minlength="2" maxlength="120" placeholder="Nom de l’espace">
+        <textarea id="room-description" maxlength="1000" placeholder="Description (facultative)"></textarea>
+        <button type="submit">Créer un espace</button>
+      </form>
+      <div id="room-list"></div>
+
+      <hr>
+      <h3>Accepter une invitation</h3>
+      <form id="accept-invite">
+        <input id="invite-token" required placeholder="Jeton reçu">
+        <button type="submit">Accepter</button>
+      </form>
+    </section>
+
+    <section>
+      <h2 id="room-title">Sélectionnez un espace</h2>
+      <p id="status" role="status"></p>
+
+      <div id="room-tools" hidden>
+        <h3>Inviter un membre de l’entreprise</h3>
+        <form id="invite-form" class="row">
+          <input id="invite-email" type="email" required placeholder="Adresse e-mail">
+          <select id="invite-role">
+            <option value="member">Membre</option>
+            <option value="observer">Observateur</option>
+            <option value="admin">Administrateur</option>
+          </select>
+          <button type="submit">Inviter</button>
+        </form>
+        <p id="invite-result" class="muted"></p>
+
+        <h3>Messages</h3>
+        <div id="messages" aria-live="polite"></div>
+        <form id="message-form" class="row">
+          <input id="message-input" maxlength="4000" required placeholder="Écrire un message…">
+          <button type="submit">Envoyer</button>
+        </form>
+
+        <h3>Fichiers partagés</h3>
+        <form id="file-form" class="row">
+          <input id="file-input" type="file" required>
+          <button type="submit">Déposer</button>
+        </form>
+        <ul id="file-list"></ul>
+
+        <h3>Activités récentes</h3>
+        <ul id="activity-list"></ul>
+      </div>
+    </section>
+  </main>
+  <script src="js/rooms.js"></script>
+</body>
+</html>
