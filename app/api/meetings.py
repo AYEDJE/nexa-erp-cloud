@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import ALGORITHM, SECRET_KEY
 from app.core.database import get_db
-from app.core.rbac import get_current_user
+from app.core.rbac import canonical_user_type, get_current_user
 from app.core.tenant import get_current_tenant_id
 from app.core.tenant_db import get_tenant_sessionmaker
 from app.models.meeting import MeetingMemberORM, MeetingORM
@@ -25,6 +25,31 @@ class MeetingCreate(BaseModel):
 
 class MemberAdd(BaseModel):
     email: str = Field(min_length=3, max_length=255)
+
+
+def _is_admin(current_user: dict, db: Session | None = None, tenant_id: str | None = None) -> bool:
+    role = canonical_user_type(current_user.get("user_type"))
+    if role in {"admin", "super_admin"}:
+        return True
+    if db is None or not tenant_id:
+        email = str(current_user.get("sub") or "").strip().lower()
+        if not email:
+            return False
+        db = get_tenant_sessionmaker(tenant_id or current_user.get("tenant_id"))() if tenant_id else None
+        if db is None:
+            return False
+    email = str(current_user.get("sub") or "").strip().lower()
+    tenant = tenant_id or current_user.get("tenant_id")
+    if not tenant or not email:
+        return False
+    if db is None:
+        db = get_tenant_sessionmaker(tenant)()
+    try:
+        user = db.query(UserORM).filter(UserORM.email == email, UserORM.tenant_id == tenant).first()
+        return canonical_user_type(getattr(user, "user_type", None)) in {"admin", "super_admin"}
+    finally:
+        if db is not None and tenant_id is not None:
+            db.close()
 
 
 def _actor(db: Session, current_user: dict, tenant_id: str) -> UserORM:
@@ -60,6 +85,8 @@ def create_meeting(
     current_user: dict = Depends(get_current_user),
 ):
     actor = _actor(db, current_user, tenant_id)
+    if not _is_admin(current_user, db=db, tenant_id=tenant_id):
+        raise HTTPException(status_code=403, detail="Seul l'administrateur peut créer et lancer une réunion.")
     meeting = MeetingORM(tenant_id=tenant_id, title=body.title.strip(), created_by=actor.id)
     db.add(meeting)
     db.flush()
@@ -76,13 +103,16 @@ def list_meetings(
     current_user: dict = Depends(get_current_user),
 ):
     actor = _actor(db, current_user, tenant_id)
-    rows = db.query(MeetingORM).join(
-        MeetingMemberORM, MeetingMemberORM.meeting_id == MeetingORM.id
-    ).filter(
-        MeetingORM.tenant_id == tenant_id,
-        MeetingMemberORM.tenant_id == tenant_id,
-        MeetingMemberORM.user_id == actor.id,
-    ).order_by(MeetingORM.created_at.desc()).limit(100).all()
+    if _is_admin(current_user, db=db, tenant_id=tenant_id):
+        rows = db.query(MeetingORM).filter(MeetingORM.tenant_id == tenant_id).order_by(MeetingORM.created_at.desc()).limit(100).all()
+    else:
+        rows = db.query(MeetingORM).join(
+            MeetingMemberORM, MeetingMemberORM.meeting_id == MeetingORM.id
+        ).filter(
+            MeetingORM.tenant_id == tenant_id,
+            MeetingMemberORM.tenant_id == tenant_id,
+            MeetingMemberORM.user_id == actor.id,
+        ).order_by(MeetingORM.created_at.desc()).limit(100).all()
     return [{"id": row.id, "title": row.title, "created_by": row.created_by,
              "is_closed": row.is_closed, "created_at": row.created_at} for row in rows]
 
@@ -96,6 +126,8 @@ def add_meeting_member(
     current_user: dict = Depends(get_current_user),
 ):
     actor = _actor(db, current_user, tenant_id)
+    if not _is_admin(current_user, db=db, tenant_id=tenant_id):
+        raise HTTPException(status_code=403, detail="Seul l'administrateur peut inviter des collaborateurs.")
     meeting = _meeting_for_member(db, tenant_id, meeting_id, actor.id)
     if meeting.created_by != actor.id:
         raise HTTPException(status_code=403, detail="Seul le créateur peut inviter des participants.")
@@ -125,6 +157,8 @@ def close_meeting(
     current_user: dict = Depends(get_current_user),
 ):
     actor = _actor(db, current_user, tenant_id)
+    if not _is_admin(current_user, db=db, tenant_id=tenant_id):
+        raise HTTPException(status_code=403, detail="Seul l'administrateur peut fermer la réunion.")
     meeting = _meeting_for_member(db, tenant_id, meeting_id, actor.id)
     if meeting.created_by != actor.id:
         raise HTTPException(status_code=403, detail="Seul le créateur peut terminer la réunion.")
@@ -137,7 +171,6 @@ def close_meeting(
 
 @router.websocket("/{meeting_id}/live")
 async def meeting_signal(websocket: WebSocket, meeting_id: int):
-    # Authentifier via le premier message au lieu de placer le JWT dans l'URL.
     await websocket.accept()
     db = None
     tenant_id = None
