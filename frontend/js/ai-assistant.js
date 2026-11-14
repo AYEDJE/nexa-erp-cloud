@@ -332,22 +332,25 @@
     }
 
     function navigateIfRequested(prompt) {
-      const normalized = prompt.toLocaleLowerCase(language);
-      const openIntent =
-        /\b(ouvre|ouvrir|va à|aller à|open|go to)\b|افتح|اذهب إلى/i.test(normalized);
+  const normalized = prompt.toLocaleLowerCase(language).trim();
+  const command = normalized.match(
+    /^(ouvre|ouvrir|va à|aller à|open|go to)\s+(.+?)[.!?]*$/i
+  );
 
-      if (!openIntent) return false;
+  // Une question ou une phrase complète reste une question pour l'assistant.
+  if (!command) return false;
 
-      const route = routes.find(item =>
-        item.terms.some(term => normalized.includes(term))
-      );
+  const target = command[2].trim();
+  const route = routes.find(item =>
+    item.terms.some(term => target === term)
+  );
 
-      if (!route) return false;
+  if (!route) return false;
 
-      addMessage(settings.navigation, "assistant");
-      window.location.assign(route.href);
-      return true;
-    }
+  addMessage(settings.navigation, "assistant");
+  window.location.assign(route.href);
+  return true;
+}
 
     async function sendQuestion(question) {
       const prompt = question.trim();
