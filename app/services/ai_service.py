@@ -54,7 +54,11 @@ def _fallback_response(metrics: Dict[str, Any], language: Optional[str], prompt:
         actions = [
             "Export the financial summary as PDF",
             "Review pending invoices",
+<<<<<<< HEAD
             "Analyze sales by category",
+=======
+            "Analyze sales by category"
+>>>>>>> 78c0d32b1c6f4adcdd854922797263ee3721f4bd
         ]
     elif lang_code == "ar":
         answer = (
@@ -64,7 +68,11 @@ def _fallback_response(metrics: Dict[str, Any], language: Optional[str], prompt:
         actions = [
             "تصدير الملخص المالي بصيغة PDF",
             "مراجعة الفواتير المعلقة",
+<<<<<<< HEAD
             "تحليل المبيعات حسب الفئة",
+=======
+            "تحليل المبيعات حسب الفئة"
+>>>>>>> 78c0d32b1c6f4adcdd854922797263ee3721f4bd
         ]
     else:
         answer = (
@@ -75,13 +83,21 @@ def _fallback_response(metrics: Dict[str, Any], language: Optional[str], prompt:
         actions = [
             "Exporter le résumé financier en PDF",
             "Relancer les factures en attente",
+<<<<<<< HEAD
             "Analyser les ventes par catégorie",
+=======
+            "Analyser les ventes par catégorie"
+>>>>>>> 78c0d32b1c6f4adcdd854922797263ee3721f4bd
         ]
 
     return {
         "answer": answer,
         "metrics_summary": metrics,
+<<<<<<< HEAD
         "suggested_actions": actions,
+=======
+        "suggested_actions": actions
+>>>>>>> 78c0d32b1c6f4adcdd854922797263ee3721f4bd
     }
 
 
@@ -138,7 +154,11 @@ def process_ai_query(
     prompt: str,
     db: Session,
     tenant_id: str,
+<<<<<<< HEAD
     language: str = "fr",
+=======
+    language: str = "fr"
+>>>>>>> 78c0d32b1c6f4adcdd854922797263ee3721f4bd
 ) -> Dict[str, Any]:
     """
     Analyse contextuelle RAG : exécute d'abord les métriques réelles du tenant,
@@ -154,8 +174,16 @@ def process_ai_query(
             "suggested_actions": [
                 "Exporter la synthèse financière",
                 "Relancer les factures impayées",
+<<<<<<< HEAD
                 "Analyser les performances par catégorie",
             ],
         }
 
     return _fallback_response(metrics, language, prompt)
+=======
+                "Analyser les performances par catégorie"
+            ],
+        }
+
+    return _fallback_response(metrics, language, prompt)
+>>>>>>> 78c0d32b1c6f4adcdd854922797263ee3721f4bd

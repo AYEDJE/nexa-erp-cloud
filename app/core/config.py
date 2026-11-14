@@ -1,3 +1,4 @@
+"""Configuration centralisée de l'application NexaERP Cloud"""
 import os
 
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ MAX_FAILED_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION_MINUTES = 15
 SESSION_IDLE_MINUTES = int(os.getenv("SESSION_IDLE_MINUTES", "30"))
 
+# IA / fournisseur OpenAI
 AI_PROVIDER = os.getenv("AI_PROVIDER", "mock").strip().lower()
 AI_API_KEY = os.getenv("AI_API_KEY", "").strip()
 AI_API_BASE_URL = os.getenv("AI_API_BASE_URL", "https://api.openai.com/v1").rstrip("/")
