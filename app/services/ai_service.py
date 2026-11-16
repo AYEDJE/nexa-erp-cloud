@@ -9,8 +9,13 @@ import httpx
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-<<<<<<< HEAD
-from app.core.config import AI_API_BASE_URL, AI_API_KEY, AI_MODEL, AI_PROVIDER, AI_TIMEOUT_SECONDS
+from app.core.config import (
+    AI_API_BASE_URL,
+    AI_API_KEY,
+    AI_MODEL,
+    AI_PROVIDER,
+    AI_TIMEOUT_SECONDS,
+)
 from app.models.invoice import DocumentType, InvoiceORM, InvoiceStatus
 
 logger = logging.getLogger(__name__)
@@ -32,61 +37,48 @@ def _build_metrics(db: Session, tenant_id: str) -> Dict[str, Any]:
         InvoiceORM.status.in_([InvoiceStatus.VALIDATED, InvoiceStatus.PAID]),
     )
 
-    totals = db.query(
-        func.count(InvoiceORM.id).label("invoice_count"),
-        func.coalesce(func.sum(InvoiceORM.total_ht), 0.0).label("revenue_ht"),
-        func.coalesce(func.sum(InvoiceORM.total_ttc), 0.0).label("revenue_ttc"),
-    ).filter(
-        InvoiceORM.tenant_id == tenant_id,
-        InvoiceORM.doc_type == DocumentType.INVOICE,
-        InvoiceORM.status.in_([InvoiceStatus.VALIDATED, InvoiceStatus.PAID]),
-    ).one()
-
-    month_totals = db.query(
-        func.count(InvoiceORM.id).label("invoice_count"),
-        func.coalesce(func.sum(InvoiceORM.total_ttc), 0.0).label("revenue_ttc"),
-    ).filter(
-        InvoiceORM.tenant_id == tenant_id,
-        InvoiceORM.doc_type == DocumentType.INVOICE,
-        InvoiceORM.status.in_([InvoiceStatus.VALIDATED, InvoiceStatus.PAID]),
-        InvoiceORM.date >= month_start,
-        InvoiceORM.date < next_month,
-    ).one()
-=======
-from app.core.config import (
-    AI_API_BASE_URL,
-    AI_API_KEY,
-    AI_MODEL,
-    AI_PROVIDER,
-    AI_TIMEOUT_SECONDS,
-)
-from app.models.invoice import InvoiceORM
-
-
-def _build_metrics(db: Session, tenant_id: str) -> Dict[str, Any]:
-    total_invoices = (
-        db.query(InvoiceORM)
-        .filter(InvoiceORM.tenant_id == tenant_id)
-        .count()
+    totals = (
+        db.query(
+            func.count(InvoiceORM.id).label("invoice_count"),
+            func.coalesce(func.sum(InvoiceORM.total_ht), 0.0).label("revenue_ht"),
+            func.coalesce(func.sum(InvoiceORM.total_ttc), 0.0).label("revenue_ttc"),
+        )
+        .filter(
+            InvoiceORM.tenant_id == tenant_id,
+            InvoiceORM.doc_type == DocumentType.INVOICE,
+            InvoiceORM.status.in_([InvoiceStatus.VALIDATED, InvoiceStatus.PAID]),
+        )
+        .one()
     )
 
-    totals = db.query(
-        func.coalesce(func.sum(InvoiceORM.total_ht), 0.0).label("sum_ht"),
-        func.coalesce(func.sum(InvoiceORM.total_ttc), 0.0).label("sum_ttc"),
-    ).filter(InvoiceORM.tenant_id == tenant_id).first()
-
-    sum_ht = float(totals.sum_ht) if totals else 0.0
-    sum_ttc = float(totals.sum_ttc) if totals else 0.0
-    avg_invoice = sum_ttc / total_invoices if total_invoices > 0 else 0.0
->>>>>>> 3050b9a (suppression du menu room live et modification de ai_service)
+    month_totals = (
+        db.query(
+            func.count(InvoiceORM.id).label("invoice_count"),
+            func.coalesce(func.sum(InvoiceORM.total_ttc), 0.0).label("revenue_ttc"),
+        )
+        .filter(
+            InvoiceORM.tenant_id == tenant_id,
+            InvoiceORM.doc_type == DocumentType.INVOICE,
+            InvoiceORM.status.in_([InvoiceStatus.VALIDATED, InvoiceStatus.PAID]),
+            InvoiceORM.date >= month_start,
+            InvoiceORM.date < next_month,
+        )
+        .one()
+    )
 
     paid_count = sales_query.filter(InvoiceORM.status == InvoiceStatus.PAID).count()
-    validated_count = sales_query.filter(InvoiceORM.status == InvoiceStatus.VALIDATED).count()
-    draft_count = db.query(InvoiceORM).filter(
-        InvoiceORM.tenant_id == tenant_id,
-        InvoiceORM.doc_type == DocumentType.INVOICE,
-        InvoiceORM.status == InvoiceStatus.DRAFT,
+    validated_count = sales_query.filter(
+        InvoiceORM.status == InvoiceStatus.VALIDATED
     ).count()
+    draft_count = (
+        db.query(InvoiceORM)
+        .filter(
+            InvoiceORM.tenant_id == tenant_id,
+            InvoiceORM.doc_type == DocumentType.INVOICE,
+            InvoiceORM.status == InvoiceStatus.DRAFT,
+        )
+        .count()
+    )
 
     invoice_count = int(totals.invoice_count or 0)
     revenue_ttc = float(totals.revenue_ttc or 0.0)
@@ -102,10 +94,15 @@ def _build_metrics(db: Session, tenant_id: str) -> Dict[str, Any]:
         "draft_invoices_count": draft_count,
         "revenue_total_ht": round(float(totals.revenue_ht or 0.0), 2),
         "revenue_total_ttc": round(revenue_ttc, 2),
-        "average_invoice_ttc": round(revenue_ttc / invoice_count, 2) if invoice_count else 0.0,
+        "average_invoice_ttc": (
+            round(revenue_ttc / invoice_count, 2) if invoice_count else 0.0
+        ),
         "current_month_sales_invoice_count": int(month_totals.invoice_count or 0),
         "current_month_revenue_ttc": round(float(month_totals.revenue_ttc or 0.0), 2),
-        "revenue_definition": "Validated and paid invoices only; excludes drafts, quotes, and cancelled documents. Partial receipts are not deducted.",
+        "revenue_definition": (
+            "Validated and paid invoices only; excludes drafts, quotes, and cancelled "
+            "documents. Partial receipts are not deducted."
+        ),
     }
 
 
@@ -114,40 +111,36 @@ def _lang_code(language: Optional[str]) -> str:
     return code if code in {"fr", "en", "ar"} else "fr"
 
 
-<<<<<<< HEAD
-def _fallback_response(metrics: Dict[str, Any], language: Optional[str], prompt: str) -> Dict[str, Any]:
+def _fallback_response(
+    metrics: Dict[str, Any], language: Optional[str], prompt: str
+) -> Dict[str, Any]:
     lang = _lang_code(language)
     total = metrics.get("revenue_total_ttc", 0)
     current = metrics.get("current_month_revenue_ttc", 0)
     count = metrics.get("sales_invoices_count", 0)
-=======
-def _fallback_response(
-    metrics: Dict[str, Any],
-    language: Optional[str],
-    prompt: str,
-) -> Dict[str, Any]:
-    lang_code = _lang_code(language)
-    total_invoices = metrics.get("total_invoices", 0)
-    sum_ttc = float(metrics.get("total_revenue_ttc", 0.0) or 0.0)
-    avg_invoice = float(metrics.get("average_invoice_value", 0.0) or 0.0)
-    tenant_id = metrics.get("tenant_id", "tenant")
->>>>>>> 3050b9a (suppression du menu room live et modification de ai_service)
 
     if lang == "en":
         answer = (
-<<<<<<< HEAD
             "The AI service is currently unavailable, so this is a basic report from your ERP data. "
             f"There are {count} validated or paid sales invoices, with total turnover of {total:,.2f} FCFA. "
             f"Current-month turnover is {current:,.2f} FCFA. I could not fully analyze: {prompt}"
         )
-        actions = ["Check the AI provider configuration", "Review invoice statuses", "Retry your question"]
+        actions = [
+            "Check the AI provider configuration",
+            "Review invoice statuses",
+            "Retry your question",
+        ]
     elif lang == "ar":
         answer = (
             "خدمة الذكاء الاصطناعي غير متاحة حالياً؛ هذه خلاصة أساسية من بيانات النظام. "
             f"عدد فواتير البيع المعتمدة أو المدفوعة {count}، وإجمالي المبيعات {total:,.2f} فرنك أفريقي. "
             f"مبيعات الشهر الحالي {current:,.2f} فرنك أفريقي. تعذر تحليل الطلب بالكامل: {prompt}"
         )
-        actions = ["تحقق من إعدادات مزود الذكاء الاصطناعي", "راجع حالات الفواتير", "أعد المحاولة"]
+        actions = [
+            "تحقق من إعدادات مزود الذكاء الاصطناعي",
+            "راجع حالات الفواتير",
+            "أعد المحاولة",
+        ]
     else:
         answer = (
             "Le service IA est indisponible pour le moment ; voici un résumé simple des données ERP. "
@@ -155,71 +148,27 @@ def _fallback_response(
             f"Le chiffre d'affaires du mois en cours est de {current:,.2f} FCFA. "
             f"Je ne peux pas analyser complètement votre demande : {prompt}"
         )
-        actions = ["Vérifier la configuration du fournisseur IA", "Contrôler les statuts des factures", "Réessayer la question"]
+        actions = [
+            "Vérifier la configuration du fournisseur IA",
+            "Contrôler les statuts des factures",
+            "Réessayer la question",
+        ]
 
     return {"answer": answer, "metrics_summary": metrics, "suggested_actions": actions}
 
 
-def _call_openai(prompt: str, language: Optional[str], metrics: Dict[str, Any]) -> Optional[str]:
+def _call_openai(
+    prompt: str, language: Optional[str], metrics: Dict[str, Any]
+) -> Optional[str]:
     if AI_PROVIDER != "openai":
         logger.warning("AI_PROVIDER is not set to 'openai'; using local fallback")
         return None
     if not AI_API_KEY:
         logger.warning("AI_API_KEY is empty; using local fallback")
-=======
-            f"Based on the current data for {tenant_id}, you issued "
-            f"{total_invoices} invoice(s) with a total turnover of "
-            f"{sum_ttc:,.2f} FCFA and an average invoice value of "
-            f"{avg_invoice:,.2f} FCFA. Your request was: '{prompt}'."
-        )
-        actions = [
-            "Export the financial summary as PDF",
-            "Review pending invoices",
-            "Analyze sales by category",
-        ]
-    elif lang_code == "ar":
-        answer = (
-            f"استناداً إلى بيانات {tenant_id}، أصدرت {total_invoices} فاتورة "
-            f"بإجمالي مبيعات قدره {sum_ttc:,.2f} فرنك أفريقي ومتوسط قيمة "
-            f"الفاتورة {avg_invoice:,.2f} فرنك أفريقي. طلبك كان: '{prompt}'."
-        )
-        actions = [
-            "تصدير الملخص المالي بصيغة PDF",
-            "مراجعة الفواتير المعلقة",
-            "تحليل المبيعات حسب الفئة",
-        ]
-    else:
-        answer = (
-            f"En analysant les données actuelles de l'entreprise {tenant_id}, "
-            f"vous avez émis {total_invoices} facture(s) pour un chiffre "
-            f"d'affaires total de {sum_ttc:,.2f} FCFA et un panier moyen "
-            f"de {avg_invoice:,.2f} FCFA. Votre demande était : '{prompt}'."
-        )
-        actions = [
-            "Exporter le résumé financier en PDF",
-            "Relancer les factures en attente",
-            "Analyser les ventes par catégorie",
-        ]
-
-    return {
-        "answer": answer,
-        "metrics_summary": metrics,
-        "suggested_actions": actions,
-    }
-
-
-def _call_openai(
-    prompt: str,
-    language: Optional[str],
-    metrics: Dict[str, Any],
-) -> Optional[str]:
-    if AI_PROVIDER != "openai" or not AI_API_KEY:
->>>>>>> 3050b9a (suppression du menu room live et modification de ai_service)
         return None
 
     lang = _lang_code(language)
     system_prompt = (
-<<<<<<< HEAD
         "Tu es l'assistant financier de NexaERP. Réponds dans la langue demandée et traite précisément la question. "
         "Base les chiffres exclusivement sur le contexte ERP fourni. Distingue clairement les périodes et statuts. "
         "N'invente aucun chiffre. Si une information n'est pas présente, dis-le et explique quelle donnée manque. "
@@ -230,18 +179,6 @@ def _call_openai(
         f"Langue de réponse : {lang}\n"
         f"Question : {prompt}\n"
         f"Contexte financier ERP : {json.dumps(metrics, ensure_ascii=False)}"
-=======
-        "Tu es un assistant financier expert pour un ERP SaaS B2B. "
-        "Réponds de manière claire, utile et concise dans la langue demandée. "
-        "Utilise uniquement les données de contexte fournies. "
-        "Si les données nécessaires sont absentes, dis-le explicitement."
-    )
-    user_prompt = (
-        f"Langue de réponse attendue : {lang_code}\n\n"
-        f"Demande utilisateur : {prompt}\n\n"
-        f"Données financières du tenant : "
-        f"{json.dumps(metrics, ensure_ascii=False)}"
->>>>>>> 3050b9a (suppression du menu room live et modification de ai_service)
     )
 
     try:
@@ -259,7 +196,6 @@ def _call_openai(
             timeout=AI_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-<<<<<<< HEAD
         payload = response.json()
         content = payload.get("choices", [{}])[0].get("message", {}).get("content")
         if isinstance(content, str) and content.strip():
@@ -267,23 +203,13 @@ def _call_openai(
         logger.warning("OpenAI returned no assistant message")
     except httpx.HTTPStatusError as exc:
         # Log status only; never log API keys, headers, or response bodies.
-        logger.warning("OpenAI returned HTTP %s; using local fallback", exc.response.status_code)
+        logger.warning(
+            "OpenAI returned HTTP %s; using local fallback", exc.response.status_code
+        )
     except (httpx.RequestError, ValueError, KeyError, IndexError, TypeError) as exc:
-        logger.warning("OpenAI request failed (%s); using local fallback", type(exc).__name__)
-
-    return None
-=======
-
-        payload = response.json()
-        content = payload.get("choices", [{}])[0].get("message", {}).get("content")
-
-        if isinstance(content, str) and content.strip():
-            return content.strip()
-
-    except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
-        # En cas d'échec OpenAI, l'assistant utilisera la réponse de secours.
-        return None
->>>>>>> 3050b9a (suppression du menu room live et modification de ai_service)
+        logger.warning(
+            "OpenAI request failed (%s); using local fallback", type(exc).__name__
+        )
 
     return None
 
@@ -294,7 +220,6 @@ def process_ai_query(
     tenant_id: str,
     language: str = "fr",
 ) -> Dict[str, Any]:
-<<<<<<< HEAD
     """Build tenant-scoped sales context and answer with OpenAI or an explicit fallback."""
     metrics = _build_metrics(db, tenant_id)
     answer = _call_openai(prompt, language, metrics)
@@ -310,24 +235,3 @@ def process_ai_query(
             "Comparer avec le mois précédent",
         ],
     }
-=======
-    """
-    Calcule les métriques du tenant connecté, puis appelle OpenAI si configuré.
-    En cas d'indisponibilité, renvoie une réponse de secours.
-    """
-    metrics = _build_metrics(db, tenant_id)
-    ai_answer = _call_openai(prompt, language, metrics)
-
-    if ai_answer:
-        return {
-            "answer": ai_answer,
-            "metrics_summary": metrics,
-            "suggested_actions": [
-                "Exporter la synthèse financière",
-                "Relancer les factures impayées",
-                "Analyser les performances par catégorie",
-            ],
-        }
-
-    return _fallback_response(metrics, language, prompt)
->>>>>>> 3050b9a (suppression du menu room live et modification de ai_service)
