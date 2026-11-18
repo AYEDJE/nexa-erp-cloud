@@ -15,7 +15,7 @@ LOCKOUT_DURATION_MINUTES = 15
 SESSION_IDLE_MINUTES = int(os.getenv("SESSION_IDLE_MINUTES", "30"))
 
 # IA / fournisseur OpenAI
-AI_PROVIDER = os.getenv("AI_PROVIDER", "mock").strip().lower()
+AI_PROVIDER = os.getenv("AI_PROVIDER", "openai").strip().lower()
 AI_API_KEY = os.getenv("AI_API_KEY", "").strip()
 AI_API_BASE_URL = os.getenv("AI_API_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 AI_MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
