@@ -351,7 +351,8 @@
   window.location.assign(route.href);
   return true;
 }
-
+    // Historique de la conversation en cours.
+    const conversationHistory = [];
     async function sendQuestion(question) {
       const prompt = question.trim();
 
@@ -386,7 +387,11 @@
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ prompt, language })
+          body: JSON.stringify({
+            prompt,
+            language,
+            history: conversationHistory.slice(-12)
+          })
         });
 
         if (!response.ok) {
@@ -400,6 +405,25 @@
             : settings.error;
 
         addMessage(answer, "assistant");
+        // Mémoriser les deux derniers échanges.
+conversationHistory.push(
+    {
+        role: "user",
+        content: prompt
+    },
+    {
+        role: "assistant",
+        content: answer
+    }
+);
+
+// Limiter la mémoire aux 12 derniers messages.
+if (conversationHistory.length > 12) {
+    conversationHistory.splice(
+        0,
+        conversationHistory.length - 12
+    );
+}
         status.textContent = "";
 
         if (speakToggle.checked) {
