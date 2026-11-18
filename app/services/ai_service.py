@@ -346,15 +346,15 @@ et précise les limites de ton accès.
         ) from exc
 
     except httpx.RequestError as exc:
-        logger.error(
-            "Erreur de connexion OpenAI : %s",
-            type(exc).__name__
-        )
+    logger.exception(
+        "Erreur de connexion IA : %s",
+        str(exc)
+    )
 
-        raise HTTPException(
-            status_code=502,
-            detail="Impossible de contacter le fournisseur OpenAI."
-        ) from exc
+    raise HTTPException(
+        status_code=502,
+        detail="Impossible de contacter le fournisseur IA."
+    ) from exc
 
 
 def process_ai_query(
